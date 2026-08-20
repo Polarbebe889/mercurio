@@ -1,0 +1,14 @@
+# Render Blueprint (plan free).
+# ATENCION: en el plan free el disco del contenedor es efímero: si la
+# instancia duerme o se redespliega, bunker.db y /uploads se reinician.
+# Para persistir de verdad: monta un Disco (plan pagado) o cambia
+# DATABASE_URL a Postgres.
+services:
+  - type: web
+    name: el-bunker-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
