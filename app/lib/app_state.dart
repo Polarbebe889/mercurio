@@ -9,6 +9,7 @@ import 'ws_manager.dart';
 
 class AppState extends ChangeNotifier {
   String? token;
+  String? username; // persistente para header x-user-id
   Usuario? yo;
   bool conectado = false;
   String? fallo; // mensaje de error para la UI (registro, etc.)
@@ -24,19 +25,36 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> eventos = []; // evento WS más recientes para banners
   WsManager? ws;
 
-  Api? get api => token == null ? null : Api(token!);
+  Api? get api => token == null ? null : Api(token!, username);
 
   /// Devuelve `true` si ya hay sesión guardada.
   Future<bool> cargarSesion() async {
     final prefs = await SharedPreferences.getInstance();
     token = prefs.getString('token');
+    username = prefs.getString('username');
     return token != null;
+  }
+
+  Future<void> guardarSesion(String t, String u) async {
+    token = t;
+    username = u;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('token', t);
+    await prefs.setString('username', u);
+    _conectarWs();
+    await recargarTodo();
+    notifyListeners();
   }
 
   Future<void> guardarToken(String t) async {
     token = t;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', t);
+    // si username no está, lo derivamos de yo si existe
+    if (username == null && yo != null) {
+      username = yo!.username;
+      await prefs.setString('username', username!);
+    }
     _conectarWs();
     await recargarTodo();
     notifyListeners();
@@ -46,9 +64,14 @@ class AppState extends ChangeNotifier {
     ws?.cerrar();
     ws = null;
     token = null;
+    username = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
+    await prefs.remove('username');
     usuarios = [];
+    drops = [];
+    historias = [];
+    pines = [];
     notifyListeners();
   }
 

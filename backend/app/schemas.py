@@ -13,14 +13,20 @@ class EstadoPlanIn(str, Enum):
 
 
 # ---------------------------------------------------------------------------
-# Auth
+# Auth - Login persistente con PIN 4 dígitos
 # ---------------------------------------------------------------------------
 class RegistroIn(BaseModel):
     username: str = Field(min_length=2, max_length=32)
-    display_name: str = Field(min_length=2, max_length=40)
+    display_name: str = Field(min_length=1, max_length=40, default="")
     join_code: str
     emoji: str = "🫡"
     avatar_color: str = "#EDE9E2"
+    pin: str = Field(default="0000", min_length=4, max_length=4, pattern=r"^\d{4}$")
+
+
+class LoginIn(BaseModel):
+    username: str = Field(min_length=2, max_length=32)
+    pin: str = Field(min_length=4, max_length=4, pattern=r"^\d{4}$")
 
 
 class UsuarioOut(BaseModel):

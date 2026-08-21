@@ -116,10 +116,12 @@ def historial(
         .all()
     )
     usuarios = {u.id: u for u in db.query(Usuario).all()}
-    return [
-        partida_dict(p, usuarios.get(p.jugador1_id), usuarios.get(p.jugador2_id))
-        for p in items
-    ]
+    return {
+        "partidas": [
+            partida_dict(p, usuarios.get(p.jugador1_id), usuarios.get(p.jugador2_id))
+            for p in items
+        ]
+    }
 
 
 @router.get("/ranking")
@@ -150,4 +152,4 @@ def ranking(db: Session = Depends(get_db), _: Usuario = Depends(get_usuario_actu
     filas.sort(key=lambda f: f["elo"], reverse=True)
     for i, f in enumerate(filas, start=1):
         f["posicion"] = i
-    return filas
+    return {"ranking": filas}

@@ -64,6 +64,8 @@ class Usuario(Base):
     avatar_color: Mapped[str] = mapped_column(String(9), default="#EDE9E2")
     # Token de acceso de la app (cerrado: sin contraseñas, solo el grupo).
     token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # PIN 4 dígitos para login persistente (ej. 'ova' + 1234). Null para usuarios legacy.
+    pin: Mapped[str | None] = mapped_column(String(4), nullable=True)
     # Estado del lobby ("Jugando Xbox", "En camino"…)
     status_text: Mapped[str | None] = mapped_column(String(120), nullable=True)
     status_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

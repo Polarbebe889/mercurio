@@ -18,11 +18,20 @@ class ApiError implements Exception {
 
 class Api {
   final String _token;
-  Api(this._token);
+  final String? _username;
+  Api(this._token, [this._username]);
 
-  Map<String, String> get _h => {'x-token': _token};
+  Map<String, String> get _h {
+    final m = <String, String>{'x-token': _token};
+    final u = _username;
+    if (u != null && u.isNotEmpty) {
+      m['x-user-id'] = u;
+      m['x-username'] = u;
+    }
+    return m;
+  }
 
-  Future<Map<String, dynamic>> _send(
+  Future<dynamic> _send(
       Future<http.Response> Function() fn) async {
     final r = await fn();
     if (r.statusCode >= 400) {
@@ -33,12 +42,28 @@ class Api {
       } catch (_) {}
       throw ApiError(r.statusCode, msg);
     }
-    return jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
+    final decoded = jsonDecode(utf8.decode(r.bodyBytes));
+    return decoded;
+  }
+
+  // Helper: extrae lista de respuesta envuelta { "drops": [...] } o directa [...] para compat.
+  List<dynamic> _unwrapList(dynamic decoded, String key) {
+    if (decoded is List) return decoded;
+    if (decoded is Map<String, dynamic>) {
+      final v = decoded[key];
+      if (v is List) return v;
+      // fallback: si el map contiene una sola lista, devuélvela
+      for (final e in decoded.values) {
+        if (e is List) return e;
+      }
+    }
+    return [];
   }
 
   // ── auth / lobby ────────────────────────────────────────────────
   Future<Map<String, dynamic>> me() =>
-      _send(() => http.get(Uri.parse('${AppConfig.apiBase}/auth/me'), headers: _h));
+      _send(() => http.get(Uri.parse('${AppConfig.apiBase}/auth/me'), headers: _h))
+          .then((j) => j as Map<String, dynamic>);
 
   Future<List<dynamic>> lobby() => _send(
       () => http.get(Uri.parse('${AppConfig.apiBase}/lobby'), headers: _h))
@@ -67,9 +92,10 @@ class Api {
       () => http.delete(Uri.parse('${AppConfig.apiBase}/musica/me'), headers: _h));
 
   // ── drops ───────────────────────────────────────────────────────
+  // FIX CRÍTICO: backend ahora devuelve {"drops": [...]}, no una lista directa
   Future<List<dynamic>> drops() => _send(
       () => http.get(Uri.parse('${AppConfig.apiBase}/drops'), headers: _h))
-          .then((j) => j as List);
+          .then((j) => _unwrapList(j, 'drops'));
 
   Future<Map<String, dynamic>> subirDrop(File foto, String caption) {
     final req = http.MultipartRequest(
@@ -79,20 +105,22 @@ class Api {
           'file', foto.readAsBytesSync(),
           filename: 'foto.jpg'))
       ..fields['caption'] = caption;
-    return _send(() => req.send().then(http.Response.fromStream));
+    return _send(() => req.send().then(http.Response.fromStream))
+        .then((j) => j as Map<String, dynamic>);
   }
 
   Future<void> borrarDrop(int id) =>
       _send(() => http.delete(Uri.parse('${AppConfig.apiBase}/drops/$id'), headers: _h));
 
   // ── voz ─────────────────────────────────────────────────────────
+  // FIX CRÍTICO: backend envuelve en {"historias": [...]} y {"pines": [...]}
   Future<List<dynamic>> historias() => _send(
       () => http.get(Uri.parse('${AppConfig.apiBase}/voz/historias'), headers: _h))
-          .then((j) => j as List);
+          .then((j) => _unwrapList(j, 'historias'));
 
   Future<List<dynamic>> pines() => _send(
       () => http.get(Uri.parse('${AppConfig.apiBase}/voz/pines'), headers: _h))
-          .then((j) => j as List);
+          .then((j) => _unwrapList(j, 'pines'));
 
   Future<Map<String, dynamic>> subirHistoria(File audio, int durationS) {
     final req = http.MultipartRequest(
@@ -102,7 +130,8 @@ class Api {
           'file', audio.readAsBytesSync(),
           filename: 'voz.m4a', contentType: MediaType('audio', 'mp4')))
       ..fields['duration_s'] = '$durationS';
-    return _send(() => req.send().then(http.Response.fromStream));
+    return _send(() => req.send().then(http.Response.fromStream))
+        .then((j) => j as Map<String, dynamic>);
   }
 
   Future<Map<String, dynamic>> subirPin(File audio, String caption, int durationS) {
@@ -114,7 +143,8 @@ class Api {
           filename: 'pin.m4a', contentType: MediaType('audio', 'mp4')))
       ..fields['caption'] = caption
       ..fields['duration_s'] = '$durationS';
-    return _send(() => req.send().then(http.Response.fromStream));
+    return _send(() => req.send().then(http.Response.fromStream))
+        .then((j) => j as Map<String, dynamic>);
   }
 
   Future<void> borrarHistoria(int id) =>
@@ -137,20 +167,20 @@ class Api {
             'marcador1': m1,
             'marcador2': m2,
             'juego': juego,
-          })));
+          }))).then((j) => j as Map<String, dynamic>);
 
   Future<List<dynamic>> partidas() => _send(
       () => http.get(Uri.parse('${AppConfig.apiBase}/partidas'), headers: _h))
-          .then((j) => j as List);
+          .then((j) => _unwrapList(j, 'partidas'));
 
   Future<List<dynamic>> ranking() => _send(
       () => http.get(Uri.parse('${AppConfig.apiBase}/partidas/ranking'), headers: _h))
-          .then((j) => j as List);
+          .then((j) => _unwrapList(j, 'ranking'));
 
   // ── planes ──────────────────────────────────────────────────────
   Future<List<dynamic>> planes() => _send(
       () => http.get(Uri.parse('${AppConfig.apiBase}/planes'), headers: _h))
-          .then((j) => j as List);
+          .then((j) => _unwrapList(j, 'planes'));
 
   Future<Map<String, dynamic>> crearPlan(String titulo, String lugar, DateTime cuando) =>
       _send(() => http.post(
@@ -161,7 +191,7 @@ class Api {
             'descripcion': '',
             'lugar': lugar,
             'starts_at': cuando.toIso8601String(),
-          })));
+          }))).then((j) => j as Map<String, dynamic>);
 
   Future<void> setPlanEstado(int planId, String estado) =>
       _send(() => http.put(

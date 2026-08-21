@@ -37,10 +37,11 @@ class _RegistroScreenState extends State<RegistroScreen> {
         headers: {'content-type': 'application/json'},
         body: jsonEncode({
           'username': _username.text.trim(),
-          'display_name': _nombre.text.trim(),
+          'display_name': _nombre.text.trim().isEmpty ? _username.text.trim() : _nombre.text.trim(),
           'join_code': _codigo.text.trim(),
           'emoji': _emoji,
           'avatar_color': _color,
+          'pin': '0000',
         }),
       );
       if (r.statusCode >= 400) {
@@ -52,7 +53,9 @@ class _RegistroScreenState extends State<RegistroScreen> {
         throw ApiError(r.statusCode, msg);
       }
       final j = jsonDecode(r.body) as Map<String, dynamic>;
-      await app.guardarToken(j['token'] as String);
+      final tok = j['token'] as String;
+      final usr = (j['usuario']?['username'] ?? _username.text.trim()).toString();
+      await app.guardarSesion(tok, usr);
     } catch (e) {
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');

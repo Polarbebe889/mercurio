@@ -25,7 +25,7 @@ def listar_drops(
     items = (
         db.query(DropsFoto).order_by(DropsFoto.created_at.desc()).limit(min(limite, 200)).all()
     )
-    return [drop_dict(d) for d in items]
+    return {"drops": [drop_dict(d) for d in items]}
 
 
 @router.post("", status_code=201)

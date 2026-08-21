@@ -28,13 +28,15 @@ def listar_planes(
         # Muestra el de hoy y lo que venga después de la hora pasada.
         q = q.filter(Plan.starts_at >= datetime.utcnow() - timedelta(hours=1))
     planes = q.order_by(Plan.starts_at.asc()).limit(30).all()
-    return [
-        {
-            **plan_dict(p),
-            "creador": {"id": p.creador.id, "display_name": p.creador.display_name},
-        }
-        for p in planes
-    ]
+    return {
+        "planes": [
+            {
+                **plan_dict(p),
+                "creador": {"id": p.creador.id, "display_name": p.creador.display_name},
+            }
+            for p in planes
+        ]
+    }
 
 
 @router.post("", status_code=201)

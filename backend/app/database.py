@@ -39,3 +39,14 @@ def init_db() -> None:
     from . import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    # Migración idempotente para columna pin (usuarios legacy sin PIN)
+    try:
+        from sqlalchemy import inspect, text
+
+        insp = inspect(engine)
+        cols = [c["name"] for c in insp.get_columns("usuarios")]
+        if "pin" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE usuarios ADD COLUMN pin VARCHAR(4)"))
+    except Exception:
+        pass  # en Postgres o si ya existe, ignora; el siguiente boot reintenta

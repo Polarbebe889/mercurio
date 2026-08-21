@@ -59,10 +59,15 @@ app = FastAPI(
     lifespan=_lifespan,
 )
 
+# CORS: si es wildcard no se puede usar allow_credentials=True (falla en navegadores)
+_cors_origins = config.CORS_ORIGINS
+_cors_credentials = True
+if len(_cors_origins) == 1 and _cors_origins[0] == "*":
+    _cors_credentials = False
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -70,10 +75,12 @@ app.add_middleware(
 app.mount("/uploads", StaticFiles(directory=config.UPLOAD_DIR), name="uploads")
 
 # ---------------------------------------------------------------------------
-# Routers de negocio (autenticados con header x-token)
+# Routers de negocio (autenticados con header x-token + x-user-id)
 # ---------------------------------------------------------------------------
 app.include_router(auth.router)
 app.include_router(spotify.router)
+app.include_router(spotify.router_api)
+app.include_router(spotify.router_api_auth)
 app.include_router(lobby.router)
 app.include_router(musica.router)
 app.include_router(drops.router)

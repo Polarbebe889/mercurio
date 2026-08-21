@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_state.dart';
 import 'screens/dashboard_premium.dart';
-import 'screens/registro.dart';
+import 'screens/login_screen.dart';
 import 'theme/uranio_premium_theme.dart';
 
 final AppState app = AppState();
@@ -33,7 +33,8 @@ class _ElBunkerAppState extends State<ElBunkerApp> {
         title: 'Mercurio',
         debugShowCheckedModeBanner: false,
         theme: UranioPremiumTheme.dark,
-        home: app.token == null ? const RegistroScreen() : const DashboardPremium(),
+        // Login persistente: si hay token -> Dashboard, si no -> Login minimalista
+        home: app.token == null ? const LoginScreen() : const DashboardPremium(),
       ),
     );
   }

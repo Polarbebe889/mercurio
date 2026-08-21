@@ -17,8 +17,9 @@ import 'package:mime/mime.dart';
 class PhotoUploadService {
   final String baseUrl;
   final String Function() getAuthToken;
+  final String Function()? getUsername;
 
-  PhotoUploadService({required this.baseUrl, required this.getAuthToken});
+  PhotoUploadService({required this.baseUrl, required this.getAuthToken, this.getUsername});
 
   Future<Map<String, dynamic>> uploadDrop({
     required File imageFile,
@@ -36,6 +37,11 @@ class PhotoUploadService {
     final uri = Uri.parse('$baseUrl/drops');
     final request = http.MultipartRequest('POST', uri);
     request.headers['x-token'] = getAuthToken();
+    final uname = getUsername?.call();
+    if (uname != null && uname.isNotEmpty) {
+      request.headers['x-user-id'] = uname;
+      request.headers['x-username'] = uname;
+    }
 
     // 2. ESTE ES EL FIX: contentType explícito en vez de dejar el default.
     final multipartFile = await http.MultipartFile.fromPath(

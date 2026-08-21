@@ -119,6 +119,10 @@ class _DashboardPremiumState extends State<DashboardPremium> {
       final uri = Uri.parse('${AppConfig.apiBase}/drops');
       final req = http.MultipartRequest('POST', uri);
       req.headers['x-token'] = app.token ?? '';
+      if (app.username != null && app.username!.isNotEmpty) {
+        req.headers['x-user-id'] = app.username!;
+        req.headers['x-username'] = app.username!;
+      }
       req.files.add(await http.MultipartFile.fromPath('file', file.path, contentType: MediaType(parts[0], parts[1])));
       req.fields['caption'] = '';
       if (!mounted) return;

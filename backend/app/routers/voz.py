@@ -21,7 +21,7 @@ MAX_HISTORIAS_USUARIO = 6  # anillos simultáneos visibles
 
 
 # ---------------------------------------------------------------------------
-# Historias de voz (24 h)
+# Historias de voz (24 h) - envueltas en dict para Flutter jsonDecode -> Map
 # ---------------------------------------------------------------------------
 @router.get("/historias")
 def historias(
@@ -34,7 +34,7 @@ def historias(
         .order_by(NotaVoz.created_at.desc())
         .all()
     )
-    return [nota_dict(n) for n in notas]
+    return {"historias": [nota_dict(n) for n in notas]}
 
 
 @router.post("/historias", status_code=201)
@@ -102,7 +102,7 @@ def listar_pines(
     pines = (
         db.query(PinAudio).order_by(PinAudio.created_at.desc()).limit(50).all()
     )
-    return [pin_dict(p) for p in pines]
+    return {"pines": [pin_dict(p) for p in pines]}
 
 
 @router.post("/pines", status_code=201)
