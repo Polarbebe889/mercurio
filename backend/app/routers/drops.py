@@ -22,10 +22,20 @@ TIPOS = {"image/jpeg", "image/png", "image/webp", "image/heic"}
 def listar_drops(
     limite: int = 50, db: Session = Depends(get_db), _: Usuario = Depends(get_usuario_actual)
 ):
-    items = (
-        db.query(DropsFoto).order_by(DropsFoto.created_at.desc()).limit(min(limite, 200)).all()
+    # REGLA: solo 1 drop activo por usuario → el más reciente por usuario_id
+    # Traemos ordenados por fecha desc y deduplicamos por usuario.
+    todos = (
+        db.query(DropsFoto).order_by(DropsFoto.created_at.desc()).all()
     )
-    return {"drops": [drop_dict(d) for d in items]}
+    vistos: set[int] = set()
+    filtrados: list[DropsFoto] = []
+    for d in todos:
+        if d.usuario_id not in vistos:
+            vistos.add(d.usuario_id)
+            filtrados.append(d)
+        if len(filtrados) >= min(limite, 200):
+            break
+    return {"drops": [drop_dict(d) for d in filtrados]}
 
 
 @router.post("", status_code=201)
@@ -36,6 +46,17 @@ async def crear_drop(
     usuario: Usuario = Depends(get_usuario_actual),
 ):
     filename, mime, size = await guardar_media(file, TIPOS, config.MAX_PHOTO_BYTES)
+    # REGLA: 1 drop por usuario → elimina drops anteriores del mismo usuario (DB limpia)
+    viejos = db.query(DropsFoto).filter(DropsFoto.usuario_id == usuario.id).all()
+    for v in viejos:
+        try:
+            eliminar_media(v.filename)
+        except Exception:
+            pass
+        db.delete(v)
+    # flush para que no haya conflicto de clave antes de insertar
+    if viejos:
+        db.flush()
     drop = DropsFoto(
         usuario_id=usuario.id,
         filename=filename,
@@ -54,6 +75,9 @@ async def crear_drop(
             "autor": {"id": usuario.id, "display_name": usuario.display_name},
         }
     )
+    # Notificar borrado de los anteriores para que el frontend los quite
+    for v in viejos:
+        await manager.transmitir({"type": "drop.borrado", "drop_id": v.id})
     return drop_dict(drop)
 
 

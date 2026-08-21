@@ -25,6 +25,36 @@ class _VozScreenState extends State<VozScreen> {
   bool _grabandoPin = false;
 
   @override
+  void initState() {
+    super.initState();
+    _configurarAudio();
+  }
+
+  Future<void> _configurarAudio() async {
+    try {
+      await _player.setAudioContext(AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: {
+            AVAudioSessionOptions.defaultToSpeaker,
+            AVAudioSessionOptions.mixWithOthers,
+          },
+        ),
+        android: const AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          stayAwake: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gain,
+        ),
+      ));
+      debugPrint('[Voz] AudioContext playback configurado (iOS silencioso OK)');
+    } catch (e, st) {
+      debugPrint('[Voz] error setAudioContext: $e\n$st');
+    }
+  }
+
+  @override
   void dispose() {
     _recorder.dispose();
     _player.dispose();
@@ -102,9 +132,35 @@ class _VozScreenState extends State<VozScreen> {
     );
   }
 
-  void _preview(NotaVoz n) {
-    _player.play(UrlSource(AppConfig.fullUrl(n.audioUrl)));
-    _snack('▶ ${n.durationS}s');
+  Future<void> _preview(NotaVoz n) async {
+    final url = AppConfig.fullUrl(n.audioUrl);
+    debugPrint('[Voz] play request: $url (orig: ${n.audioUrl})');
+    try {
+      // Asegura sesión iOS playback antes de cada play (por si fue interrumpida)
+      await _player.setAudioContext(AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: {
+            AVAudioSessionOptions.defaultToSpeaker,
+            AVAudioSessionOptions.mixWithOthers,
+          },
+        ),
+        android: const AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          stayAwake: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gain,
+        ),
+      ));
+      await _player.stop();
+      await _player.play(UrlSource(url));
+      _snack('▶ ${n.durationS}s');
+      debugPrint('[Voz] play OK: $url');
+    } catch (e, st) {
+      debugPrint('[Voz] ERROR streaming $url: $e\n$st');
+      _snack('Error audio: $e');
+    }
   }
 
   void _snack(String m) =>
@@ -260,6 +316,50 @@ class _PinTileState extends State<_PinTile> {
   final _player = AudioPlayer();
 
   @override
+  void initState() {
+    super.initState();
+    _configAudioPin();
+  }
+
+  Future<void> _configAudioPin() async {
+    try {
+      await _player.setAudioContext(AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: {
+            AVAudioSessionOptions.defaultToSpeaker,
+            AVAudioSessionOptions.mixWithOthers,
+          },
+        ),
+        android: const AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          stayAwake: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gain,
+        ),
+      ));
+    } catch (e, st) {
+      debugPrint('[Pin] error setAudioContext: $e\n$st');
+    }
+  }
+
+  Future<void> _playPin(PinAudio pin) async {
+    final url = AppConfig.fullUrl(pin.audioUrl);
+    debugPrint('[Pin] play $url');
+    try {
+      await _player.stop();
+      await _player.play(UrlSource(url));
+      debugPrint('[Pin] play OK: $url');
+    } catch (e, st) {
+      debugPrint('[Pin] ERROR $url: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error audio: $e')));
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _player.dispose();
     super.dispose();
@@ -284,8 +384,7 @@ class _PinTileState extends State<_PinTile> {
           children: [
             IconButton(
               icon: const Icon(Icons.play_arrow),
-              onPressed: () =>
-                  _player.play(UrlSource(AppConfig.fullUrl(pin.audioUrl))),
+              onPressed: () => _playPin(pin),
             ),
             if (soy)
               IconButton(

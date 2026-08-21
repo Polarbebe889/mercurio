@@ -1,6 +1,7 @@
 """Serialización a dicts planos (SQLite local: siempre se lee todo fresco
 dentro del request; nada de lazy-loading tras cerrar la sesión)."""
 
+from .. import config
 from ..config import ELO_K, ELO_INICIAL
 from ..models import (  # noqa: F401  (re-export útiles para routers)
     AhoraEscuchando,
@@ -14,6 +15,14 @@ from ..models import (  # noqa: F401  (re-export útiles para routers)
     Usuario,
 )
 from .elo_service import esperado  # noqa: F401
+
+
+def _abs_upload(filename: str) -> str:
+    """Construye URL HTTPS absoluta para un archivo en /uploads."""
+    if filename.startswith("http"):
+        return filename
+    # API_BASE_URL ya sin trailing slash
+    return f"{config.API_BASE_URL}/uploads/{filename}"
 
 
 def usuario_dict(u: Usuario, con_musica: bool = True) -> dict:
@@ -50,7 +59,7 @@ def nota_dict(n: NotaVoz) -> dict:
     return {
         "id": n.id,
         "usuario_id": n.usuario_id,
-        "audio_url": f"/uploads/{n.filename}",
+        "audio_url": _abs_upload(n.filename),
         "duration_s": n.duration_s,
         "created_at": n.created_at.isoformat(),
         "expires_at": n.expires_at.isoformat(),
@@ -61,7 +70,7 @@ def pin_dict(p: PinAudio) -> dict:
     return {
         "id": p.id,
         "usuario_id": p.usuario_id,
-        "audio_url": f"/uploads/{p.filename}",
+        "audio_url": _abs_upload(p.filename),
         "duration_s": p.duration_s,
         "caption": p.caption,
         "created_at": p.created_at.isoformat(),
@@ -72,7 +81,7 @@ def drop_dict(d: DropsFoto) -> dict:
     return {
         "id": d.id,
         "usuario_id": d.usuario_id,
-        "img_url": f"/uploads/{d.filename}",
+        "img_url": _abs_upload(d.filename),
         "mime_type": d.mime_type,
         "size_bytes": d.size_bytes,
         "caption": d.caption,
@@ -87,7 +96,7 @@ def partida_dict(p: Partida, j1: Usuario, j2: Usuario) -> dict:
         "marcador1": p.marcador1,
         "marcador2": p.marcador2,
         "ganador_id": p.ganador_id,
-        "reaction_audio": f"/uploads/{p.reaction_audio}"
+        "reaction_audio": _abs_upload(p.reaction_audio)
         if p.reaction_audio
         else None,
         "jugador1": {"id": j1.id, "display_name": j1.display_name, "elo": p.elo1_antes, "elo_final": p.elo1_despues},
