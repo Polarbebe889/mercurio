@@ -1,8 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:universal_io/io.dart';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:record/record.dart';
 
 import '../config.dart';
@@ -69,12 +72,17 @@ class _VozScreenState extends State<VozScreen> {
       _snack('Permiso de micrófono denegado');
       return;
     }
-    final path = kIsWeb
-        ? 'voz_${DateTime.now().millisecondsSinceEpoch}.wav'
-        : '${(await Directory.systemTemp.createTemp('bunker_')).path}/voz_${DateTime.now().millisecondsSinceEpoch}.m4a';
-    final cfg = kIsWeb
-        ? const RecordConfig(encoder: AudioEncoder.wav)
-        : const RecordConfig(encoder: AudioEncoder.aacLc);
+    // PWA iOS: wav no va, usa aacLc/mp4 con fallback a opus
+    String path;
+    RecordConfig cfg;
+    if (kIsWeb) {
+      path = 'voz_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      cfg = const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100);
+    } else {
+      final dir = await Directory.systemTemp.createTemp('bunker_');
+      path = '${dir.path}/voz_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      cfg = const RecordConfig(encoder: AudioEncoder.aacLc);
+    }
     try {
       await _recorder.start(cfg, path: path);
     } catch (e) {
@@ -102,20 +110,34 @@ class _VozScreenState extends State<VozScreen> {
       return;
     }
     try {
-      if (pin) {
-        final caption = await _pedirTexto('Caption del pin', 'Frase del pin');
-        await app.api!.subirPin(File(path), caption ?? '', seg);
-        _snack('Pin fijado');
+      if (kIsWeb) {
+        // Web: path es blob URL, hay que fetchear bytes
+        final bytes = await _fetchBlobBytes(path);
+        if (bytes == null || bytes.isEmpty) throw Exception('Audio web vacío');
+        if (pin) {
+          final caption = await _pedirTexto('Caption del pin', 'Frase del pin');
+          await app.api!.subirHistoriaWeb(bytes, 'voz_${DateTime.now().millisecondsSinceEpoch}.m4a', seg, isPin: true, caption: caption ?? '');
+          _snack('Pin fijado (web)');
+        } else {
+          await app.api!.subirHistoriaWeb(bytes, 'voz_${DateTime.now().millisecondsSinceEpoch}.m4a', seg);
+          _snack('Historia subida (24h) (web)');
+        }
       } else {
-        await app.api!.subirHistoria(File(path), seg);
-        _snack('Historia subida (24h)');
+        if (pin) {
+          final caption = await _pedirTexto('Caption del pin', 'Frase del pin');
+          await app.api!.subirPin(File(path), caption ?? '', seg);
+          _snack('Pin fijado');
+        } else {
+          await app.api!.subirHistoria(File(path), seg);
+          _snack('Historia subida (24h)');
+        }
       }
     } catch (e) {
       _snack('$e');
     } finally {
-      try {
-        File(path).delete();
-      } catch (_) {}
+      if (!kIsWeb) {
+        try { File(path).delete(); } catch (_) {}
+      }
     }
   }
 
@@ -165,6 +187,14 @@ class _VozScreenState extends State<VozScreen> {
       debugPrint('[Voz] ERROR streaming $url: $e\n$st');
       _snack('Error audio: $e');
     }
+  }
+
+  Future<Uint8List?> _fetchBlobBytes(String blobUrl) async {
+    try {
+      final r = await http.get(Uri.parse(blobUrl));
+      if (r.statusCode == 200 && r.bodyBytes.isNotEmpty) return r.bodyBytes;
+    } catch (_) {}
+    return null;
   }
 
   void _snack(String m) =>

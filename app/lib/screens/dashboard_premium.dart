@@ -118,9 +118,24 @@ class _DashboardPremiumState extends State<DashboardPremium> {
       return;
     }
     try {
-      final path = kIsWeb ? 'mercurio_${DateTime.now().millisecondsSinceEpoch}.wav' : '${Directory.systemTemp.path}/mercurio_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      final cfg = kIsWeb ? const RecordConfig(encoder: AudioEncoder.wav, bitRate: 128000, sampleRate: 44100) : const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100);
-      await _recorder.start(cfg, path: path);
+      // PWA iOS: MediaRecorder solo soporta aacLc/mp4, no wav. Intentamos aacLc primero, fallback a opus/wav
+      String path;
+      RecordConfig cfg;
+      if (kIsWeb) {
+        // iOS Safari PWA necesita aacLc con mp4, no wav
+        path = 'mercurio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        cfg = const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100);
+        try { await _recorder.start(cfg, path: path); } catch (e) {
+          debugPrint('[Voz] aacLc web falló $e, probando opus');
+          cfg = const RecordConfig(encoder: AudioEncoder.opus, bitRate: 128000, sampleRate: 44100);
+          path = 'mercurio_${DateTime.now().millisecondsSinceEpoch}.opus';
+          await _recorder.start(cfg, path: path);
+        }
+      } else {
+        path = '${Directory.systemTemp.path}/mercurio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        cfg = const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100);
+        await _recorder.start(cfg, path: path);
+      }
       setState(() { _grabando = true; _inicio = DateTime.now(); });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('● Grabando — toca de nuevo para enviar'), duration: Duration(seconds: 2)));

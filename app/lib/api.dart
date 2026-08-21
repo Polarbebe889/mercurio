@@ -1,6 +1,7 @@
 /// Cliente HTTP del API de El Bunker (multipart para subidas).
 
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:universal_io/io.dart';
 
 import 'package:http/http.dart' as http;
@@ -130,6 +131,18 @@ class Api {
           'file', audio.readAsBytesSync(),
           filename: 'voz.m4a', contentType: MediaType('audio', 'mp4')))
       ..fields['duration_s'] = '$durationS';
+    return _send(() => req.send().then(http.Response.fromStream))
+        .then((j) => j as Map<String, dynamic>);
+  }
+
+  // Web: sube desde bytes (blob) con fallback opus/wav
+  Future<Map<String, dynamic>> subirHistoriaWeb(Uint8List bytes, String filename, int durationS, {bool isPin=false, String caption=''}) {
+    final path = isPin ? '${AppConfig.apiBase}/voz/pines' : '${AppConfig.apiBase}/voz/historias';
+    final req = http.MultipartRequest('POST', Uri.parse(path))
+      ..headers.addAll(_h)
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename, contentType: MediaType('audio', filename.endsWith('.wav') ? 'wav' : 'mp4')))
+      ..fields['duration_s'] = '$durationS';
+    if (isPin) req.fields['caption'] = caption;
     return _send(() => req.send().then(http.Response.fromStream))
         .then((j) => j as Map<String, dynamic>);
   }
