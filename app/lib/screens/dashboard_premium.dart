@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -477,17 +476,56 @@ class _PlanesDetail extends StatefulWidget {
   State<_PlanesDetail> createState()=>_PlanesDetailState();
 }
 class _PlanesDetailState extends State<_PlanesDetail> {
-  final titulo=TextEditingController(); final lugar=TextEditingController();
+  final titulo=TextEditingController(); final lugar=TextEditingController(); final desc=TextEditingController();
+  DateTime _cuando = DateTime.now().add(const Duration(hours:2));
+  bool _creando=false;
+  String _fmt(DateTime d)=> "${d.day.toString().padLeft(2,'0')}/${d.month.toString().padLeft(2,'0')} ${d.hour.toString().padLeft(2,'0')}:${d.minute.toString().padLeft(2,'0')}";
+  Future<void> _pickCuando() async {
+    final d = await showDatePicker(context: context, initialDate: _cuando, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days:60)), builder: (c,w)=> Theme(data: ThemeData.dark(), child: w!));
+    if (d==null) return;
+    final t = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(_cuando));
+    if (t==null) return;
+    setState(()=> _cuando = DateTime(d.year,d.month,d.day,t.hour,t.minute));
+  }
   @override
   Widget build(BuildContext context){
     return _DetailScaffold(title:'Planes', child: ListView(children:[
-      TextField(controller: titulo, decoration: const InputDecoration(hintText:'Qué hacemos…')),
-      const SizedBox(height:8),
-      TextField(controller: lugar, decoration: const InputDecoration(hintText:'Dónde…')),
-      const SizedBox(height:8),
-      FilledButton(style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFFF8E7), foregroundColor: Color(0xFF050505)), onPressed: () async { if(titulo.text.isEmpty) return; await app.api!.crearPlan(titulo.text, lugar.text, DateTime.now().add(const Duration(hours:2))); await app.recargarTodo(); setState((){}); }, child: const Text('Crear plan')),
-      const SizedBox(height:16),
-      ...app.planes.map((p)=> Card(color: const Color(0xFF141414), child: ListTile(title: Text(p.titulo, style: const TextStyle(color: Colors.white)), subtitle: Text(p.lugar ?? '', style: const TextStyle(color: Color(0xFF8A929A))), trailing: Wrap(spacing:4, children:[ChoiceChip(label: const Text('Voy'), selected: p.estadoDe(app.yo?.id??-1)=='en_camino', onSelected: (_)=>app.api!.setPlanEstado(p.id,'en_camino').then((_)=>app.recargarTodo().then((_)=>setState((){}))))])))),
+      Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: const Color(0xFF141414), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(0.06))), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Row(children: [Icon(Icons.event_rounded, size: 14, color: Color(0xFF8A929A)), SizedBox(width:6), Text('NUEVO PLAN', style: TextStyle(color: Color(0xFF8A929A), fontSize: 10, letterSpacing: 1.2))]),
+        const SizedBox(height:12),
+        TextField(controller: titulo, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText:'Qué hacemos… ej: Carnita asada', hintStyle: TextStyle(color: Color(0xFF5A6270)), filled: true, fillColor: Color(0xFF0A0A0A), border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))), prefixIcon: Icon(Icons.title, size: 16, color: Color(0xFF8A929A)))),
+        const SizedBox(height:8),
+        TextField(controller: lugar, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText:'Dónde… ej: Casa de ova', hintStyle: TextStyle(color: Color(0xFF5A6270)), filled: true, fillColor: Color(0xFF0A0A0A), border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))), prefixIcon: Icon(Icons.place_outlined, size: 16, color: Color(0xFF8A929A)))),
+        const SizedBox(height:8),
+        TextField(controller: desc, style: const TextStyle(color: Colors.white, fontSize: 13), maxLines: 2, decoration: const InputDecoration(hintText:'Detalles opcionales…', hintStyle: TextStyle(color: Color(0xFF5A6270)), filled: true, fillColor: Color(0xFF0A0A0A), border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))), prefixIcon: Icon(Icons.notes_rounded, size: 16, color: Color(0xFF8A929A)))),
+        const SizedBox(height:10),
+        InkWell(onTap: _pickCuando, borderRadius: BorderRadius.circular(10), child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12), decoration: BoxDecoration(color: const Color(0xFF0A0A0A), borderRadius: BorderRadius.circular(10)), child: Row(children: [const Icon(Icons.schedule_rounded, size: 16, color: Color(0xFF8A929A)), const SizedBox(width:8), Text(_fmt(_cuando), style: const TextStyle(color: Colors.white, fontSize: 13)), const Spacer(), const Icon(Icons.edit_calendar_rounded, size: 14, color: Color(0xFF8A929A))]))),
+        const SizedBox(height:12),
+        FilledButton(style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFFF8E7), foregroundColor: Color(0xFF050505), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), onPressed: _creando?null:() async { if(titulo.text.trim().isEmpty) return; setState(()=>_creando=true); try{ await app.api!.crearPlan(titulo.text.trim(), lugar.text.trim(), _cuando); titulo.clear(); lugar.clear(); desc.clear(); await app.recargarTodo(); if(mounted) setState(()=>_cuando=DateTime.now().add(const Duration(hours:2))); } catch(e){ if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error plan: $e')));} finally{ if(mounted) setState(()=>_creando=false);} }, child: _creando? const SizedBox(width:16,height:16, child: CircularProgressIndicator(strokeWidth:2, color: Color(0xFF050505))): const Text('Crear plan', style: TextStyle(fontWeight: FontWeight.w800)) ),
+      ])),
+      const SizedBox(height:18),
+      Row(children: [const Icon(Icons.list_alt_rounded, size: 14, color: Color(0xFF8A929A)), const SizedBox(width:6), Text('PRÓXIMOS · ${app.planes.length}', style: const TextStyle(color: Color(0xFF8A929A), fontSize: 10, letterSpacing: 1.2))]),
+      const SizedBox(height:10),
+      if (app.planes.isEmpty) Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(color: const Color(0xFF0A0A0A), borderRadius: BorderRadius.circular(12)), child: const Center(child: Text('Sin planes — crea el primero', style: TextStyle(color: Color(0xFF5A6270), fontSize: 12)))),
+      for (final p in app.planes) Container(margin: const EdgeInsets.only(bottom:10), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: const Color(0xFF141414), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(0.06))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [Expanded(child: Text(p.titulo, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700))), Container(padding: const EdgeInsets.symmetric(horizontal:8, vertical:4), decoration: BoxDecoration(color: const Color(0xFFFFF8E7), borderRadius: BorderRadius.circular(8)), child: Text(_fmt(p.startsAt), style: const TextStyle(color: Color(0xFF050505), fontSize: 10, fontWeight: FontWeight.w700)))]),
+        if ((p.lugar ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top:6), child: Row(children: [const Icon(Icons.place, size: 12, color: Color(0xFF8A929A)), const SizedBox(width:4), Expanded(child: Text(p.lugar!, style: const TextStyle(color: Color(0xFF8A929A), fontSize: 11)))])),
+        if ((p.descripcion ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top:4), child: Text(p.descripcion!, style: const TextStyle(color: Color(0xFF8A929A), fontSize: 11))),
+        const SizedBox(height:10),
+        Wrap(spacing:6, runSpacing:6, children: [
+          for (final opt in ['alistandome','en_camino','llegue'])
+            ChoiceChip(
+              label: Text(opt=='alistandome'?'Alistándome':opt=='en_camino'?'En camino':'Llegué', style: TextStyle(color: p.estadoDe(app.yo?.id??-1)==opt?const Color(0xFF050505):Colors.white, fontSize: 11)),
+              selected: p.estadoDe(app.yo?.id??-1)==opt,
+              selectedColor: const Color(0xFFFFF8E7),
+              backgroundColor: const Color(0xFF1A1A1A),
+              onSelected: (_) async { try{ await app.api!.setPlanEstado(p.id, opt); await app.recargarTodo(); if(mounted) setState((){});} catch(e){ if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));} },
+            ),
+        ]),
+        const SizedBox(height:8),
+        // avatares de estados
+        if (p.estados.isNotEmpty) Wrap(spacing:4, children: [ for (final e in p.estados) Builder(builder: (_){ final u=app.usuarioPorId(e.usuarioId); return Chip(avatar: CircleAvatar(radius:10, backgroundColor: const Color(0xFF1A1A1A), child: Text(u?.emoji ?? '🙂', style: const TextStyle(fontSize:10))), label: Text('${u?.displayName ?? e.usuarioId}: ${e.estado}', style: const TextStyle(fontSize:10)), backgroundColor: const Color(0xFF0A0A0A), labelStyle: const TextStyle(color: Color(0xFF8A929A))); }) ]),
+      ])),
     ]));
   }
 }
