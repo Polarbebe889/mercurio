@@ -10,7 +10,7 @@ class PremiumColors {
   static const accentDim = Color(0x66FFFFF0);
   static const textPrimary = Color(0xFFFFFFFF);
   static const textSecondary = Color(0xFF8A929A);
-  static const divider = Color(0x0DFFFFFF); // white 5%
+  static const divider = Color(0x0FFFFFFF); // white 6% exacto (0x0F)
 }
 
 class UranioPremiumTheme {
@@ -31,10 +31,10 @@ class UranioPremiumTheme {
         scrolledUnderElevation: 0,
         centerTitle: true,
         titleTextStyle: TextStyle(
-          color: PremiumColors.textPrimary,
+          color: Color(0xFFFFF8E7),
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          letterSpacing: 6,
+          letterSpacing: 8,
           fontFamily: 'Inter',
         ),
       ),
@@ -53,8 +53,8 @@ class UranioPremiumTheme {
   static BoxDecoration cardDecoration({bool elevated = false}) {
     return BoxDecoration(
       color: PremiumColors.surface,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: PremiumColors.divider, width: 1),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: Colors.white.withOpacity(0.06), width: 1),
       boxShadow: elevated
           ? [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 10))]
           : null,
