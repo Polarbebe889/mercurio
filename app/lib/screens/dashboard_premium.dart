@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -12,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../config.dart';
 import '../services/apple_music_push.dart';
+import '../services/audio_player_service.dart';
 
 enum MusicProvider { spotify, appleMusic }
 class DummyMusic { final String user; final String track; final String artist; final MusicProvider provider; DummyMusic(this.user,this.track,this.artist,this.provider); }
@@ -236,36 +238,70 @@ class _DashboardPremiumState extends State<DashboardPremium> {
                     )),
                   ]),
                   const SizedBox(height: 14),
-                  // PROTAGONISTA
+                  // PROTAGONISTA - muestra todos los drops (1 por usuario) + último grande
                   _heroCard(
                     tag: 'drop',
-                    detail: _DetailScaffold(title: 'Drop', child: lastDropUrl!=null?InteractiveViewer(child: Image.network(lastDropUrl)):const Text('Sin drop', style: TextStyle(color: Colors.white))),
+                    detail: _DropsDetail(drops: drops),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                       Row(children: [
                         const Icon(Icons.camera_alt_rounded, size: 14, color: Color(0xFF8A929A)),
                         const SizedBox(width: 6),
-                        const Text('ÚLTIMO DROP', style: TextStyle(color: Color(0xFF8A929A), fontSize: 10, letterSpacing: 1.2)),
+                        Text('DROPS · ${drops.length} activos', style: const TextStyle(color: Color(0xFF8A929A), fontSize: 10, letterSpacing: 1.2)),
                         const Spacer(),
                         InkWell(onTap: _tomarFoto, borderRadius: BorderRadius.circular(8), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: const Color(0xFFFFF8E7), borderRadius: BorderRadius.circular(8)), child: const Row(children: [Icon(Icons.camera_alt_rounded, size: 14, color: Color(0xFF050505)), SizedBox(width: 6), Text('Cámara', style: TextStyle(color: Color(0xFF050505), fontSize: 11, fontWeight: FontWeight.w700))]))),
                       ]),
                       const SizedBox(height: 12),
-                      lastDropUrl==null
-                          ? InkWell(onTap: _tomarFoto, child: Container(height: 320, decoration: BoxDecoration(color: const Color(0xFF0A0A0A), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withOpacity(0.04))), child: const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.camera_alt_rounded, size: 28, color: Color(0xFF8A929A)), SizedBox(height: 8), Text('Toca Cámara para tu primer drop', style: TextStyle(color: Color(0xFF8A929A), fontSize: 12))]))))
-                          : Container(
-                              height: 320,
-                              width: double.infinity,
-                              clipBehavior: Clip.antiAlias,
-                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
-                              child: Stack(children: [
-                                Positioned.fill(child: Image.network(lastDropUrl, fit: BoxFit.cover, width: double.infinity)),
-                                Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withOpacity(0.72), Colors.black.withOpacity(0.88)])))),
-                                Positioned(left: 14, right: 14, bottom: 14, child: Row(children: [
-                                  const Icon(Icons.camera_alt_rounded, size: 14, color: Color(0xFFFFF8E7)),
-                                  const SizedBox(width: 6),
-                                  Text('Último Drop · ${app.usuarioPorId(lastDrop!.usuarioId)?.displayName ?? ""}', style: const TextStyle(color: Color(0xFFFFF8E7), fontSize: 12, fontWeight: FontWeight.w600)),
-                                ])),
-                              ]),
+                      if (lastDropUrl==null)
+                        InkWell(onTap: _tomarFoto, child: Container(height: 220, decoration: BoxDecoration(color: const Color(0xFF0A0A0A), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withOpacity(0.04))), child: const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.camera_alt_rounded, size: 28, color: Color(0xFF8A929A)), SizedBox(height: 8), Text('Toca Cámara para tu primer drop', style: TextStyle(color: Color(0xFF8A929A), fontSize: 12))]))))
+                      else ...[
+                        Container(
+                          height: 280,
+                          width: double.infinity,
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+                          child: Stack(children: [
+                            Positioned.fill(child: Image.network(lastDropUrl, fit: BoxFit.cover, width: double.infinity, errorBuilder: (_,__,___)=> Container(color: const Color(0xFF0A0A0A), child: const Center(child: Icon(Icons.broken_image, color: Color(0xFF8A929A)))))),
+                            Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withOpacity(0.72), Colors.black.withOpacity(0.88)])))),
+                            Positioned(left: 14, right: 14, bottom: 14, child: Row(children: [
+                              const Icon(Icons.camera_alt_rounded, size: 14, color: Color(0xFFFFF8E7)),
+                              const SizedBox(width: 6),
+                              Expanded(child: Text('Último · ${app.usuarioPorId(lastDrop!.usuarioId)?.displayName ?? ""}', style: const TextStyle(color: Color(0xFFFFF8E7), fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                            ])),
+                          ]),
+                        ),
+                        if (drops.length > 1) ...[
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            height: 72,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: drops.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 8),
+                              itemBuilder: (_, i) {
+                                final d = drops[i];
+                                final url = AppConfig.fullUrl(d.imgUrl);
+                                final u = app.usuarioPorId(d.usuarioId);
+                                final isSelected = d.id == lastDrop!.id;
+                                return GestureDetector(
+                                  onTap: () => Navigator.push(context, PageRouteBuilder(pageBuilder: (_, a, __) => FadeTransition(opacity: a, child: _DetailScaffold(title: u?.displayName ?? 'Drop', child: InteractiveViewer(child: Image.network(url)))))),
+                                  child: Container(
+                                    width: 72,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: isSelected ? const Color(0xFFFFF8E7) : Colors.white.withOpacity(0.08), width: isSelected ? 2 : 1),
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: Stack(children: [
+                                      Positioned.fill(child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_,__,___)=> Container(color: const Color(0xFF141414), child: Center(child: Text(u?.emoji ?? '📷'))))),
+                                      Positioned(bottom: 2, left: 2, right: 2, child: Container(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(6)), child: Text(u?.displayName ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 8)))),
+                                    ]),
+                                  ),
+                                );
+                              },
                             ),
+                          ),
+                        ],
+                      ],
                     ]),
                   ),
                   const SizedBox(height: 14),
@@ -378,6 +414,19 @@ class _MusicDetail extends StatelessWidget {
       title: 'Sonando ahora',
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1DB954)), icon: const Icon(Icons.music_note, color: Colors.white), label: const Text('Conectar Spotify', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)), onPressed: () async {
+          try {
+            // Intenta via backend (usa base64 user_id, redirect correcto, no expone token)
+            final resp = await app.api!.spotifyLogin();
+            final authUrl = resp['auth_url'] as String;
+            final url = Uri.parse(authUrl);
+            if (await canLaunchUrl(url)) {
+              await launchUrl(url, mode: LaunchMode.externalApplication);
+              return;
+            }
+          } catch (e) {
+            debugPrint('[Spotify] login via API fallo: $e');
+          }
+          // Fallback legacy con token (compat con backend viejo)
           const clientId = 'c232ed3488354a57aa68e881240120d4';
           final redirect = Uri.encodeComponent('https://mercurio-9haf.onrender.com/auth/spotify/callback');
           final state = app.token ?? '';
@@ -443,19 +492,74 @@ class _PlanesDetailState extends State<_PlanesDetail> {
   }
 }
 
-class _HistoriasDetail extends StatelessWidget {
+class _HistoriasDetail extends StatefulWidget {
   final List<dynamic> usuarios;
   const _HistoriasDetail({required this.usuarios});
+  @override
+  State<_HistoriasDetail> createState()=>_HistoriasDetailState();
+}
+class _HistoriasDetailState extends State<_HistoriasDetail>{
+  Future<void> _playHistoria(dynamic h) async {
+    final url = AppConfig.fullUrl(h.audioUrl as String);
+    debugPrint('[HistoriasDetail] play $url');
+    try {
+      await AudioPlayerService.instance.play(url);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('▶ ${h.durationS}s')));
+    } catch (e, st) {
+      debugPrint('[HistoriasDetail] error $url: $e\n$st');
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error audio: $e')));
+    }
+  }
+  Future<void> _playPin(dynamic p) async {
+    final url = AppConfig.fullUrl(p.audioUrl as String);
+    debugPrint('[HistoriasDetail] play pin $url');
+    try {
+      await AudioPlayerService.instance.play(url);
+    } catch (e, st) {
+      debugPrint('[HistoriasDetail] pin error $url: $e\n$st');
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error audio: $e')));
+    }
+  }
   @override
   Widget build(BuildContext context){
     return _DetailScaffold(title:'Historias', child: ListView(children:[
       Text('${app.historias.length} historias activas (24h)', style: const TextStyle(color: Color(0xFF8A929A))),
       const SizedBox(height:8),
-      ...app.historias.map((h){ final u=app.usuarioPorId(h.usuarioId); return ListTile(leading: CircleAvatar(child: Text(u?.emoji ?? '🎙️')), title: Text(u?.displayName ?? 'alguien', style: const TextStyle(color: Colors.white)), subtitle: Text('${h.durationS}s', style: const TextStyle(color: Color(0xFF8A929A))), trailing: IconButton(icon: const Icon(Icons.play_arrow, color: Colors.white), onPressed: (){}));}),
+      ...app.historias.map((h){ final u=app.usuarioPorId(h.usuarioId); return ListTile(leading: CircleAvatar(child: Text(u?.emoji ?? '🎙️')), title: Text(u?.displayName ?? 'alguien', style: const TextStyle(color: Colors.white)), subtitle: Text('${h.durationS}s', style: const TextStyle(color: Color(0xFF8A929A))), trailing: IconButton(icon: const Icon(Icons.play_arrow, color: Colors.white), onPressed: ()=>_playHistoria(h)));}),
       const Divider(color: Color(0x14FFFFFF)),
       Text('${app.pines.length} pines', style: const TextStyle(color: Color(0xFF8A929A))),
-      ...app.pines.map((p){ final u=app.usuarioPorId(p.usuarioId); return ListTile(leading: const Icon(Icons.push_pin, color: Colors.white), title: Text(p.caption.isEmpty?'audio':p.caption, style: const TextStyle(color: Colors.white)), subtitle: Text(u?.displayName ?? '', style: const TextStyle(color: Color(0xFF8A929A))));}),
+      ...app.pines.map((p){ final u=app.usuarioPorId(p.usuarioId); return ListTile(leading: const Icon(Icons.push_pin, color: Colors.white), title: Text(p.caption.isEmpty?'audio':p.caption, style: const TextStyle(color: Colors.white)), subtitle: Text(u?.displayName ?? '', style: const TextStyle(color: Color(0xFF8A929A))), trailing: IconButton(icon: const Icon(Icons.play_arrow, color: Colors.white), onPressed: ()=>_playPin(p)));}),
     ]));
+  }
+}
+
+class _DropsDetail extends StatelessWidget {
+  final List<dynamic> drops;
+  const _DropsDetail({required this.drops});
+  @override
+  Widget build(BuildContext context) {
+    if (drops.isEmpty) {
+      return const _DetailScaffold(title: 'Drops', child: Text('Sin drops', style: TextStyle(color: Color(0xFF8A929A))));
+    }
+    return _DetailScaffold(
+      title: 'Drops · ${drops.length}',
+      child: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.9),
+        itemCount: drops.length,
+        itemBuilder: (_, i) {
+          final d = drops[i];
+          final url = AppConfig.fullUrl(d.imgUrl);
+          final u = app.usuarioPorId(d.usuarioId);
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(children: [
+              Positioned.fill(child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_,__,___)=> Container(color: const Color(0xFF141414), child: Center(child: Text(u?.emoji ?? '📷'))))),
+              Positioned(bottom: 0, left: 0, right: 0, child: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withOpacity(0.8)])), child: Text(u?.displayName ?? '', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)))),
+            ]),
+          );
+        },
+      ),
+    );
   }
 }
 

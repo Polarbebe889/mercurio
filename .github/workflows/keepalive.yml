@@ -13,4 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping backend /health
-        run: curl -sf https://TU-BACKEND.onrender.com/health || exit 0
+        run: curl -sf https://mercurio-9haf.onrender.com/health || curl -sf https://mercurio-9haf.onrender.com/ || exit 0
+      - name: Ping keep-alive fallback
+        run: curl -sf https://mercurio-9haf.onrender.com/health || echo "health check failed but not failing job"

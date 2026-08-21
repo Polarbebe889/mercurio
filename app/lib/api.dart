@@ -198,4 +198,13 @@ class Api {
           Uri.parse('${AppConfig.apiBase}/planes/$planId/estado'),
           headers: {..._h, 'content-type': 'application/json'},
           body: jsonEncode({'estado': estado})));
+
+  // ── spotify ───────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> spotifyLogin() =>
+      _send(() => http.get(Uri.parse('${AppConfig.apiBase}/api/spotify/login'), headers: _h))
+          .then((j) => j as Map<String, dynamic>);
+
+  Future<Map<String, dynamic>> spotifyStatus() =>
+      _send(() => http.get(Uri.parse('${AppConfig.apiBase}/api/spotify/status'), headers: _h))
+          .then((j) => j as Map<String, dynamic>);
 }
