@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'app_state.dart';
-import 'screens/dashboard_screen.dart';
+import 'screens/dashboard_premium.dart';
 import 'screens/registro.dart';
-import 'theme/uranio_theme.dart';
+import 'theme/uranio_premium_theme.dart';
 
 final AppState app = AppState();
 
@@ -32,8 +32,8 @@ class _ElBunkerAppState extends State<ElBunkerApp> {
       builder: (context, _) => MaterialApp(
         title: 'Mercurio',
         debugShowCheckedModeBanner: false,
-        theme: UranioTheme.dark,
-        home: app.token == null ? const RegistroScreen() : const DashboardScreen(),
+        theme: UranioPremiumTheme.dark,
+        home: app.token == null ? const RegistroScreen() : const DashboardPremium(),
       ),
     );
   }
