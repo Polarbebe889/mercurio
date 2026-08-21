@@ -30,7 +30,7 @@ class _ElBunkerAppState extends State<ElBunkerApp> {
     return ListenableBuilder(
       listenable: app,
       builder: (context, _) => MaterialApp(
-        title: 'El Bunker',
+        title: 'Mercurio',
         debugShowCheckedModeBanner: false,
         theme: temaBunker(),
         home: app.token == null ? const RegistroScreen() : const HomeScreen(),

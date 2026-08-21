@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Scaffold(
           appBar: AppBar(
             title: Row(children: [
-              const Text('EL BUNKER',
+              const Text('MERCURIO',
                   style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
               const SizedBox(width: 10),
               if (app.conectado)

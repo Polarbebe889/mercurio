@@ -73,7 +73,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('EL BUNKER',
+                  const Text('MERCURIO',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 4)),
