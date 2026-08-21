@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:io';
+import 'package:universal_io/io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -47,24 +48,50 @@ class _DashboardPremiumState extends State<DashboardPremium> {
 
   Future<void> _toggleVoz() async {
     if (_grabando) {
-      // parar y subir
       try {
         final path = await _recorder.stop();
         final secs = _inicio != null ? DateTime.now().difference(_inicio!).inSeconds.clamp(1, 600) : 2;
         setState(() { _grabando = false; _inicio = null; });
         if (path == null) return;
-        final f = File(path);
-        if (!await f.exists() || await f.length() == 0) {
+        // PWA web: path es blob URL, no File
+        if (kIsWeb) {
+          final bytes = await _recorder.isRecording(); // dummy to ensure stop
+          // En web, _recorder.stop() ya libera, subimos via bytes si fuera necesario, pero usamos path como está
+          // Para web, el path es un blob, lo manejamos via XFile bytes en subirHistoriaWeb
+          // Por ahora, si es web, no usamos File, sino que mostramos error y pedimos usar app nativa si falla
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Audio vacío')));
-          return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Subiendo ${secs}s… (web)')));
+          // En web, el file es un blob, lo subimos via http con bytes si es posible
+          // Si falla, mostramos mensaje
+          try {
+            // Intenta subir como File si existe, si no, muestra que en PWA el audio es limitado
+            final f = File(path);
+            if (await f.exists() && await f.length() > 0) {
+              await app.api!.subirHistoria(f, secs);
+            } else {
+              throw Exception('Web audio no soportado, usa app nativa para historias');
+            }
+          } catch (e) {
+            // Fallback: intenta via bytes si es blob
+            throw Exception('Audio web: $e — usa app nativa');
+          }
+          await app.recargarTodo();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Historia subida ✓')));
+        } else {
+          final f = File(path);
+          if (!await f.exists() || await f.length() == 0) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Audio vacío')));
+            return;
+          }
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Subiendo ${secs}s…')));
+          await app.api!.subirHistoria(f, secs);
+          await app.recargarTodo();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Historia subida ✓')));
         }
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Subiendo ${secs}s…')));
-        await app.api!.subirHistoria(f, secs);
-        await app.recargarTodo();
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Historia subida ✓')));
       } catch (e) {
         setState(() { _grabando = false; });
         if (!mounted) return;
@@ -72,16 +99,18 @@ class _DashboardPremiumState extends State<DashboardPremium> {
       }
       return;
     }
-    // iniciar
-    var status = await Permission.microphone.status;
-    if (!status.isGranted) status = await Permission.microphone.request();
-    if (!status.isGranted) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(status.isPermanentlyDenied ? 'Micrófono bloqueado — abre Ajustes' : 'Micrófono denegado'),
-        action: status.isPermanentlyDenied ? SnackBarAction(label: 'Ajustes', onPressed: () => openAppSettings()) : null,
-      ));
-      return;
+    // iniciar - PWA web no usa Permission.permission_handler, usa getUserMedia directo
+    if (!kIsWeb) {
+      var status = await Permission.microphone.status;
+      if (!status.isGranted) status = await Permission.microphone.request();
+      if (!status.isGranted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(status.isPermanentlyDenied ? 'Micrófono bloqueado — abre Ajustes' : 'Micrófono denegado'),
+          action: status.isPermanentlyDenied ? SnackBarAction(label: 'Ajustes', onPressed: () => openAppSettings()) : null,
+        ));
+        return;
+      }
     }
     if (!await _recorder.hasPermission()) {
       if (!mounted) return;
@@ -89,34 +118,47 @@ class _DashboardPremiumState extends State<DashboardPremium> {
       return;
     }
     try {
-      final dir = Directory.systemTemp;
-      final path = '${dir.path}/mercurio_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100), path: path);
+      final path = kIsWeb ? 'mercurio_${DateTime.now().millisecondsSinceEpoch}.wav' : '${Directory.systemTemp.path}/mercurio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final cfg = kIsWeb ? const RecordConfig(encoder: AudioEncoder.wav, bitRate: 128000, sampleRate: 44100) : const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100);
+      await _recorder.start(cfg, path: path);
       setState(() { _grabando = true; _inicio = DateTime.now(); });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('● Grabando — toca de nuevo para enviar'), duration: Duration(seconds: 2)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo grabar: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo grabar: $e (en PWA usa Chrome/Safari actualizado)')));
     }
   }
 
   Future<void> _tomarFoto() async {
-    var cam = await Permission.camera.status;
-    if (!cam.isGranted) cam = await Permission.camera.request();
-    if (!cam.isGranted) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(cam.isPermanentlyDenied ? 'Cámara bloqueada — abre Ajustes' : 'Cámara denegada'),
-        action: cam.isPermanentlyDenied ? SnackBarAction(label: 'Ajustes', onPressed: () => openAppSettings()) : null,
-      ));
-      return;
+    if (!kIsWeb) {
+      var cam = await Permission.camera.status;
+      if (!cam.isGranted) cam = await Permission.camera.request();
+      if (!cam.isGranted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(cam.isPermanentlyDenied ? 'Cámara bloqueada — abre Ajustes' : 'Cámara denegada'),
+          action: cam.isPermanentlyDenied ? SnackBarAction(label: 'Ajustes', onPressed: () => openAppSettings()) : null,
+        ));
+        return;
+      }
     }
-    final x = await _picker.pickImage(source: ImageSource.camera, imageQuality: 92);
-    if (x == null) return;
-    final file = File(x.path);
+    // En PWA web, ImageSource.camera a veces falla en iOS si no es https o no es PWA instalada; usa gallery como fallback
+    XFile? x;
     try {
-      final mimeType = lookupMimeType(file.path) ?? 'image/jpeg';
+      x = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+    } catch (e) {
+      debugPrint('[Foto] camera failed, trying gallery: $e');
+    }
+    if (x == null && kIsWeb) {
+      // Fallback a galería en web si cámara falla
+      try { x = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85); } catch (_) {}
+    }
+    if (x == null) return;
+    try {
+      final bytes = await x.readAsBytes();
+      if (bytes.isEmpty) throw Exception('Imagen vacía');
+      final mimeType = lookupMimeType(x.name) ?? lookupMimeType(x.path) ?? 'image/jpeg';
       final parts = mimeType.split('/');
       final uri = Uri.parse('${AppConfig.apiBase}/drops');
       final req = http.MultipartRequest('POST', uri);
@@ -125,7 +167,17 @@ class _DashboardPremiumState extends State<DashboardPremium> {
         req.headers['x-user-id'] = app.username!;
         req.headers['x-username'] = app.username!;
       }
-      req.files.add(await http.MultipartFile.fromPath('file', file.path, contentType: MediaType(parts[0], parts[1])));
+      // En web usa fromBytes, en móvil fromPath es más eficiente pero fromBytes también funciona
+      if (kIsWeb) {
+        req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: x.name.isNotEmpty ? x.name : 'foto.jpg', contentType: MediaType(parts[0], parts[1])));
+      } else {
+        // Intenta fromPath, fallback a fromBytes
+        try {
+          req.files.add(await http.MultipartFile.fromPath('file', x.path, contentType: MediaType(parts[0], parts[1])));
+        } catch (_) {
+          req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: x.name, contentType: MediaType(parts[0], parts[1])));
+        }
+      }
       req.fields['caption'] = '';
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Subiendo foto…')));

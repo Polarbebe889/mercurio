@@ -1,6 +1,6 @@
 // notification_service.dart — push reales vía FCM + fallback local.
 
-import 'dart:io';
+import 'package:universal_io/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_core/firebase_core.dart';

@@ -1,7 +1,7 @@
 /// Cliente HTTP del API de El Bunker (multipart para subidas).
 
 import 'dart:convert';
-import 'dart:io';
+import 'package:universal_io/io.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';

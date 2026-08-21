@@ -1,6 +1,7 @@
-import 'dart:io';
+import 'package:universal_io/io.dart';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 
@@ -64,17 +65,20 @@ class _VozScreenState extends State<VozScreen> {
 
   Future<void> _grabar({required bool pin}) async {
     if (_grabando || _grabandoPin) return;
-    if (!await _recorder.hasPermission()) {
+    if (!kIsWeb && !await _recorder.hasPermission()) {
       _snack('Permiso de micrófono denegado');
       return;
     }
-    final dir = await Directory.systemTemp.createTemp('bunker_');
-    final path =
-        '${dir.path}/voz_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final path = kIsWeb
+        ? 'voz_${DateTime.now().millisecondsSinceEpoch}.wav'
+        : '${(await Directory.systemTemp.createTemp('bunker_')).path}/voz_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final cfg = kIsWeb
+        ? const RecordConfig(encoder: AudioEncoder.wav)
+        : const RecordConfig(encoder: AudioEncoder.aacLc);
     try {
-      await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
+      await _recorder.start(cfg, path: path);
     } catch (e) {
-      _snack('No pude grabar: $e');
+      _snack('No pude grabar: $e (en PWA usa Chrome/Safari actualizado y https)');
       return;
     }
     setState(() {
