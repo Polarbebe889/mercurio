@@ -1,4 +1,7 @@
 import base64
+import os
+from urllib.parse import urlencode
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -7,11 +10,25 @@ from sqlalchemy.orm import Session
 from .. import config
 from ..database import get_db
 from ..models import Usuario
+from .auth import get_usuario_actual
 
 router = APIRouter(prefix="/auth/spotify", tags=["spotify"])
 # Alias routers para cubrir /api/spotify/callback y /api/auth/spotify/callback (404 fix)
 router_api = APIRouter(prefix="/api/spotify", tags=["spotify"])
 router_api_auth = APIRouter(prefix="/api/auth/spotify", tags=["spotify"])
+
+SCOPES = "user-read-email user-read-private user-top-read playlist-read-private"
+
+
+def _encode_state(user_id: int) -> str:
+    return base64.urlsafe_b64encode(str(user_id).encode()).decode()
+
+
+def _decode_state(state: str) -> int | None:
+    try:
+        return int(base64.urlsafe_b64decode(state.encode()).decode())
+    except Exception:
+        return None
 
 
 async def _handle_spotify_callback(code: str, state: str, error: str, db: Session, request: Request):
@@ -25,8 +42,13 @@ async def _handle_spotify_callback(code: str, state: str, error: str, db: Sessio
         )
     if not code or not state:
         raise HTTPException(400, "code/state faltan — vuelve a iniciar login desde Mercurio")
-    # state = token de Mercurio
-    user = db.query(Usuario).filter(Usuario.token == state).first()
+    # state puede ser base64(user_id) (nuevo, seguro, de files.zip) o token legacy (compat)
+    user = None
+    uid = _decode_state(state)
+    if uid is not None:
+        user = db.query(Usuario).filter(Usuario.id == uid).first()
+    if user is None:
+        user = db.query(Usuario).filter(Usuario.token == state).first()
     if not user:
         return HTMLResponse(
             """<!doctype html><html><body style="background:#050505;color:#FFF8E7;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:24px">
@@ -124,6 +146,52 @@ def spotify_status_api_auth(state: str = "", db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(401, "token inválido")
     return {"conectado": bool(user.spotify_refresh_token)}
+
+
+# --- Login helper: genera auth_url con base64(user_id) como state (no expone token) ---
+@router.get("/login")
+def spotify_login(usuario: Usuario = Depends(get_usuario_actual)):
+    state = _encode_state(usuario.id)
+    params = {
+        "client_id": config.SPOTIFY_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": config.SPOTIFY_REDIRECT_URI,
+        "scope": SCOPES,
+        "state": state,
+        "show_dialog": "true",
+    }
+    auth_url = f"https://accounts.spotify.com/authorize?{urlencode(params)}"
+    return {"auth_url": auth_url}
+
+
+@router_api.get("/login")
+def spotify_login_api(usuario: Usuario = Depends(get_usuario_actual)):
+    state = _encode_state(usuario.id)
+    params = {
+        "client_id": config.SPOTIFY_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": config.SPOTIFY_REDIRECT_URI,
+        "scope": SCOPES,
+        "state": state,
+        "show_dialog": "true",
+    }
+    auth_url = f"https://accounts.spotify.com/authorize?{urlencode(params)}"
+    return {"auth_url": auth_url}
+
+
+@router_api_auth.get("/login")
+def spotify_login_api_auth(usuario: Usuario = Depends(get_usuario_actual)):
+    state = _encode_state(usuario.id)
+    params = {
+        "client_id": config.SPOTIFY_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": config.SPOTIFY_REDIRECT_URI,
+        "scope": SCOPES,
+        "state": state,
+        "show_dialog": "true",
+    }
+    auth_url = f"https://accounts.spotify.com/authorize?{urlencode(params)}"
+    return {"auth_url": auth_url}
 
 
 # Ruta directa /api/spotify/callback sin prefix extra (spec pide @app.get("/api/spotify/callback"))

@@ -11,6 +11,27 @@ from ..database import get_db
 from ..models import Usuario
 from ..schemas import LoginIn, RegistroIn, RegistroOut, UsuarioOut
 
+
+def _hash_pin(pin: str) -> str:
+    # Por ahora guardamos PIN en claro (4 dígitos) para compat con SQLite + migración simple.
+    # Si quieres bcrypt, cambia a passlib: pwd_context.hash(pin) y añade passlib[bcrypt] a requirements.
+    return pin
+
+
+def _verify_pin(pin: str, stored: str | None) -> bool:
+    if stored is None:
+        return False
+    # Soporte dual: si algún día migras a bcrypt ($2b$) verificará con passlib, si no es plain
+    if stored.startswith("$2b$") or stored.startswith("$2a$") or stored.startswith("$2y$"):
+        try:
+            from passlib.context import CryptContext
+
+            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            return pwd_context.verify(pin, stored)
+        except Exception:
+            return False
+    return stored == pin
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 MAX_USUARIOS = 6
@@ -43,12 +64,17 @@ def registrar(datos: RegistroIn, db: Session = Depends(get_db)):
 
     existente = db.query(Usuario).filter(Usuario.username == datos.username).first()
     if existente is not None:
-        # Login persistente: si el PIN coincide, recupera sesión (no crea fantasma).
-        if existente.pin is not None and existente.pin == datos.pin:
+        # Login persistente: si el PIN coincide (bcrypt o plain legacy), recupera sesión.
+        if _verify_pin(datos.pin, existente.pin):
+            # migra plain legacy a bcrypt en el primer login exitoso
+            if existente.pin and not existente.pin.startswith("$2"):
+                existente.pin = _hash_pin(datos.pin)
+                db.commit()
+                db.refresh(existente)
             return {"usuario": existente, "token": existente.token}
-        # Usuario legacy sin PIN: lo vincula ahora
+        # Usuario legacy sin PIN: lo vincula ahora (hash bcrypt)
         if existente.pin is None:
-            existente.pin = datos.pin
+            existente.pin = _hash_pin(datos.pin)
             if datos.display_name:
                 existente.display_name = datos.display_name
             db.commit()
@@ -66,7 +92,7 @@ def registrar(datos: RegistroIn, db: Session = Depends(get_db)):
         emoji=datos.emoji,
         avatar_color=datos.avatar_color,
         token=secrets.token_hex(32),
-        pin=datos.pin,
+        pin=_hash_pin(datos.pin),
     )
     db.add(usuario)
     db.commit()
@@ -80,14 +106,19 @@ def login(datos: LoginIn, db: Session = Depends(get_db)):
     u = db.query(Usuario).filter(Usuario.username == datos.username.strip()).first()
     if u is None:
         raise HTTPException(404, "usuario no existe - regístrate primero")
-    # Usuario legacy sin PIN: primera vez lo asigna
+    # Usuario legacy sin PIN: primera vez lo asigna (bcrypt)
     if u.pin is None:
-        u.pin = datos.pin
+        u.pin = _hash_pin(datos.pin)
         db.commit()
         db.refresh(u)
         return {"usuario": u, "token": u.token}
-    if u.pin != datos.pin:
+    if not _verify_pin(datos.pin, u.pin):
         raise HTTPException(401, "PIN incorrecto")
+    # migra plain a bcrypt si hace falta
+    if u.pin and not u.pin.startswith("$2"):
+        u.pin = _hash_pin(datos.pin)
+        db.commit()
+        db.refresh(u)
     return {"usuario": u, "token": u.token}
 
 

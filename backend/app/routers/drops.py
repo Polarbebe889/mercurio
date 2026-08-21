@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .. import config
@@ -23,7 +24,39 @@ def listar_drops(
     limite: int = 50, db: Session = Depends(get_db), _: Usuario = Depends(get_usuario_actual)
 ):
     # REGLA: solo 1 drop activo por usuario → el más reciente por usuario_id
-    # Traemos ordenados por fecha desc y deduplicamos por usuario.
+    # Postgres: DISTINCT ON (usuario_id) ORDER BY usuario_id, created_at DESC (rápido, indexado)
+    # Fallback: Python dedup para SQLite/otros (Render free usa Postgres, pero tests usan SQLite)
+    dialect = db.bind.dialect.name if db.bind is not None else ""
+    if dialect == "postgresql":
+        try:
+            rows = db.execute(
+                text(
+                    """
+                    SELECT DISTINCT ON (usuario_id) *
+                    FROM drops_fotos
+                    ORDER BY usuario_id, created_at DESC
+                    """
+                )
+            ).mappings().all()
+            # rows ya son 1 por usuario, ordenar global por created_at DESC y limitar
+            filtrados = []
+            for r in rows:
+                # reconstruir DropsFoto mínimo para drop_dict (solo campos usados)
+                d = DropsFoto(
+                    id=r["id"],
+                    usuario_id=r["usuario_id"],
+                    filename=r["filename"],
+                    mime_type=r["mime_type"],
+                    size_bytes=r["size_bytes"],
+                    caption=r["caption"],
+                    created_at=r["created_at"],
+                )
+                filtrados.append(d)
+            filtrados.sort(key=lambda d: d.created_at, reverse=True)
+            filtrados = filtrados[: min(limite, 200)]
+            return {"drops": [drop_dict(d) for d in filtrados]}
+        except Exception:
+            pass  # fallback a Python si falla la query
     todos = (
         db.query(DropsFoto).order_by(DropsFoto.created_at.desc()).all()
     )
