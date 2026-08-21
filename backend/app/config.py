@@ -25,6 +25,12 @@ MEDIA_TIPOS = TIPOS_AUDIO | TIPOS_FOTO
 HORAS_VOZ = 24
 LIMPIEZA_HORAS = float(os.getenv("LIMPIEZA_HORAS", "6"))
 
+# Spotify OAuth (polling híbrido)
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "c232ed3488354a57aa68e881240120d4")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "")
+SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "https://mercurio-9haf.onrender.com/auth/spotify/callback")
+SPOTIFY_POLL_SECONDS = int(os.getenv("SPOTIFY_POLL_SECONDS", "45"))
+
 # Configuración Elo (E_Lo en contexto de certeza)
 ELO_INICIAL = 1000
 ELO_K = 32

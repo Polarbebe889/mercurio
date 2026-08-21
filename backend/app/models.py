@@ -67,6 +67,9 @@ class Usuario(Base):
     # Estado del lobby ("Jugando Xbox", "En camino"…)
     status_text: Mapped[str | None] = mapped_column(String(120), nullable=True)
     status_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Spotify OAuth
+    spotify_refresh_token: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    spotify_access_token: Mapped[str | None] = mapped_column(String(500), nullable=True)
     # Puntuación Elo
     elo: Mapped[int] = mapped_column(Integer, default=1000)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)

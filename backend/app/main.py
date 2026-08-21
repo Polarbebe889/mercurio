@@ -25,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from . import config
 from .database import SessionLocal, get_db, init_db
 from .models import Usuario
-from .routers import auth, drops, lobby, musica, partidas, planes, voz
+from .routers import auth, drops, lobby, musica, partidas, planes, spotify, voz
 from .services.cleanup_service import limpiar_notas_expiradas
 from .ws.manager import manager
 
@@ -73,6 +73,7 @@ app.mount("/uploads", StaticFiles(directory=config.UPLOAD_DIR), name="uploads")
 # Routers de negocio (autenticados con header x-token)
 # ---------------------------------------------------------------------------
 app.include_router(auth.router)
+app.include_router(spotify.router)
 app.include_router(lobby.router)
 app.include_router(musica.router)
 app.include_router(drops.router)
