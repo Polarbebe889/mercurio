@@ -451,26 +451,28 @@ class _MusicDetailState extends State<_MusicDetail> {
       title: 'Sonando ahora',
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1DB954)), icon: const Icon(Icons.music_note, color: Colors.white), label: const Text('Conectar Spotify', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)), onPressed: () async {
+          String? authUrl;
           try {
             final resp = await app.api!.spotifyLogin();
-            final authUrl = resp['auth_url'] as String;
-            final url = Uri.parse(authUrl);
-            if (await canLaunchUrl(url)) {
-              await launchUrl(url, mode: LaunchMode.externalApplication);
-              _startPolling();
-              if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Autoriza en el navegador y vuelve — detectando…'), duration: Duration(seconds:3)));
-              return;
-            }
+            authUrl = resp['auth_url'] as String;
           } catch (e) {
             debugPrint('[Spotify] login via API fallo: $e');
+            const clientId = 'c232ed3488354a57aa68e881240120d4';
+            final redirect = Uri.encodeComponent('https://mercurio-9haf.onrender.com/auth/spotify/callback');
+            final state = app.token ?? '';
+            authUrl = 'https://accounts.spotify.com/authorize?client_id=$clientId&response_type=code&redirect_uri=$redirect&scope=user-read-currently-playing%20user-read-playback-state&state=$state';
           }
-          const clientId = 'c232ed3488354a57aa68e881240120d4';
-          final redirect = Uri.encodeComponent('https://mercurio-9haf.onrender.com/auth/spotify/callback');
-          final state = app.token ?? '';
-          final url = Uri.parse('https://accounts.spotify.com/authorize?client_id=$clientId&response_type=code&redirect_uri=$redirect&scope=user-read-currently-playing%20user-read-playback-state&state=$state');
-          if (await canLaunchUrl(url)) {
-            await launchUrl(url, mode: LaunchMode.externalApplication);
+          final url = Uri.parse(authUrl!);
+          bool launched = false;
+          try { launched = await launchUrl(url, mode: LaunchMode.externalApplication); } catch (e) { debugPrint('[Spotify] launch external failed: $e'); }
+          if (!launched) {
+            try { launched = await launchUrl(url, mode: LaunchMode.platformDefault); } catch (e) { debugPrint('[Spotify] launch platformDefault failed: $e'); }
+          }
+          if (launched) {
             _startPolling();
+            if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Autoriza en el navegador y vuelve — detectando…'), duration: Duration(seconds:3)));
+          } else {
+            if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo abrir navegador: $authUrl')));
           }
         }),
         const SizedBox(height: 6),
