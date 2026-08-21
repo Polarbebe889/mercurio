@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from .. import config
 from ..database import get_db
 from ..models import DropsFoto, Usuario
+from ..services.fcm_service import notificar_a_todos
 from ..services.serializers import drop_dict
 from ..services.uploads import eliminar_media, guardar_media
 from ..ws.manager import manager
@@ -108,6 +109,17 @@ async def crear_drop(
             "autor": {"id": usuario.id, "display_name": usuario.display_name},
         }
     )
+    # Push a los otros 5
+    try:
+        await notificar_a_todos(
+            db,
+            titulo=f"{usuario.display_name} subió un drop 📸",
+            cuerpo=drop.caption or "Nuevo drop en el muro",
+            data={"type": "drop.nuevo", "drop_id": str(drop.id)},
+            excluir=usuario.id,
+        )
+    except Exception:
+        pass
     # Notificar borrado de los anteriores para que el frontend los quite
     for v in viejos:
         await manager.transmitir({"type": "drop.borrado", "drop_id": v.id})

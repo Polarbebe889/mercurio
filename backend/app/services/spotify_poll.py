@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from .. import config
 from ..database import SessionLocal
 from ..models import AhoraEscuchando, ProviderMusica, Usuario
+from ..services.fcm_service import notificar_a_todos
 from ..services.serializers import musica_dict
 from ..ws.manager import manager
 
@@ -118,6 +119,18 @@ async def _set_musica(db: Session, usuario: Usuario, titulo: str, artista: str, 
             "musica": musica_dict(musica),
         }
     )
+    # Push si está reproduciendo y tiene título
+    if reproduciendo and titulo:
+        try:
+            await notificar_a_todos(
+                db,
+                titulo=f"{usuario.display_name} 🎵 {titulo}",
+                cuerpo=artista or "Sonando en Spotify",
+                data={"type": "musica.actualizada", "usuario_id": str(usuario.id)},
+                excluir=usuario.id,
+            )
+        except Exception:
+            pass
 
 
 async def _set_no_musica(db: Session, usuario: Usuario):

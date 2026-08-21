@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import AhoraEscuchando, ProviderMusica, Usuario
 from ..schemas import MusicaIn
+from ..services.fcm_service import notificar_a_todos
 from ..services.serializers import musica_dict, usuario_dict
 from ..ws.manager import manager
 from .auth import get_usuario_actual
@@ -47,6 +48,18 @@ async def actualizar_musica(
             "musica": musica_dict(musica),
         }
     )
+    # Push solo si está reproduciendo (no spam al pausar)
+    if datos.reproduciendo and datos.titulo:
+        try:
+            await notificar_a_todos(
+                db,
+                titulo=f"{usuario.display_name} 🎵 {datos.titulo}",
+                cuerpo=datos.artista or "Sonando ahora",
+                data={"type": "musica.actualizada", "usuario_id": str(usuario.id)},
+                excluir=usuario.id,
+            )
+        except Exception:
+            pass
     return musica_dict(musica)
 
 

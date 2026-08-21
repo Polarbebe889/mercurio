@@ -207,4 +207,12 @@ class Api {
   Future<Map<String, dynamic>> spotifyStatus() =>
       _send(() => http.get(Uri.parse('${AppConfig.apiBase}/api/spotify/status?state=$_token'), headers: _h))
           .then((j) => j as Map<String, dynamic>);
+
+  // ── notificaciones ────────────────────────────────────────────────
+  Future<void> registrarFcmToken(String fcmToken, String plataforma) =>
+      _send(() => http.post(
+          Uri.parse('${AppConfig.apiBase}/notificaciones/token'),
+          headers: {..._h, 'content-type': 'application/json'},
+          body: jsonEncode({'token': fcmToken, 'plataforma': plataforma}),
+        )).then((_) => null);
 }

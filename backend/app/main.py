@@ -25,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from . import config
 from .database import SessionLocal, get_db, init_db
 from .models import Usuario
-from .routers import auth, drops, lobby, musica, partidas, planes, spotify, voz
+from .routers import auth, drops, lobby, musica, notificaciones, partidas, planes, spotify, voz
 from .services.cleanup_service import limpiar_notas_expiradas
 from .ws.manager import manager
 
@@ -100,6 +100,7 @@ app.include_router(auth.router)
 app.include_router(spotify.router)
 app.include_router(spotify.router_api)
 app.include_router(spotify.router_api_auth)
+app.include_router(notificaciones.router)
 app.include_router(lobby.router)
 app.include_router(musica.router)
 app.include_router(drops.router)

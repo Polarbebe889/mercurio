@@ -92,6 +92,7 @@ class Usuario(Base):
     musica: Mapped["AhoraEscuchando | None"] = relationship(
         back_populates="usuario", cascade="all, delete-orphan", uselist=False
     )
+    fcm_tokens: Mapped[list["FcmToken"]] = relationship(back_populates="usuario", cascade="all, delete-orphan")
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +217,23 @@ class EstadoPlanRegistro(Base):
 
     plan: Mapped["Plan"] = relationship(back_populates="estados")
     usuario: Mapped["Usuario"] = relationship(back_populates="estados_plan")
+
+
+# ---------------------------------------------------------------------------
+# Notificaciones push (FCM)
+# ---------------------------------------------------------------------------
+class FcmToken(Base):
+    __tablename__ = "fcm_tokens"
+    __table_args__ = (UniqueConstraint("token", name="uq_fcm_token"), Index("ix_fcm_usuario", "usuario_id"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"), index=True)
+    token: Mapped[str] = mapped_column(String(500))
+    plataforma: Mapped[str] = mapped_column(String(20), default="android")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    usuario: Mapped["Usuario"] = relationship(back_populates="fcm_tokens")
 
 
 # ---------------------------------------------------------------------------

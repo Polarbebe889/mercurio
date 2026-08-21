@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from .. import config
 from ..database import get_db
 from ..models import NotaVoz, PinAudio, Usuario
+from ..services.fcm_service import notificar_a_todos
 from ..services.serializers import nota_dict, pin_dict, usuario_dict
 from ..services.uploads import eliminar_media, guardar_media
 from ..ws.manager import manager
@@ -71,6 +72,16 @@ async def subir_historia(
             "autor": {"id": usuario.id, "display_name": usuario.display_name},
         }
     )
+    try:
+        await notificar_a_todos(
+            db,
+            titulo=f"{usuario.display_name} 🎙️ historia nueva",
+            cuerpo=f"{duration_s}s de audio",
+            data={"type": "voz.nueva", "nota_id": str(nota.id)},
+            excluir=usuario.id,
+        )
+    except Exception:
+        pass
     return nota_dict(nota)
 
 
@@ -132,6 +143,16 @@ async def fijar_audio(
             "autor": {"id": usuario.id, "display_name": usuario.display_name},
         }
     )
+    try:
+        await notificar_a_todos(
+            db,
+            titulo=f"{usuario.display_name} 📌 pin de audio",
+            cuerpo=caption or "Nuevo pin",
+            data={"type": "pin.audio.nuevo", "pin_id": str(pin.id)},
+            excluir=usuario.id,
+        )
+    except Exception:
+        pass
     return pin_dict(pin)
 
 

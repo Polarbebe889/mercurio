@@ -10,6 +10,7 @@ from ..database import get_db
 from ..models import Partida, Usuario
 from ..schemas import PartidaIn
 from ..services.elo_service import aplicar_elo
+from ..services.fcm_service import notificar_a_todos
 from ..services.serializers import partida_dict
 from ..services.uploads import eliminar_media, guardar_media
 from ..ws.manager import manager
@@ -71,6 +72,17 @@ async def registrar_partida(
             "partida": partida_dict(partida, usuario, contrincante),
         }
     )
+    try:
+        ganador = usuario.display_name if ganador_id == usuario.id else contrincante.display_name if ganador_id else "Empate"
+        await notificar_a_todos(
+            db,
+            titulo=f"Reta {datos.juego} 🏆",
+            cuerpo=f"{usuario.display_name} {datos.marcador1} - {datos.marcador2} {contrincante.display_name}" + (f" → {ganador}" if ganador_id else ""),
+            data={"type": "partida.nueva", "partida_id": str(partida.id)},
+            excluir=usuario.id,
+        )
+    except Exception:
+        pass
     return partida_dict(partida, usuario, contrincante)
 
 

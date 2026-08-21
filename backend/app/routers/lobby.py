@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import NotaVoz, PinAudio, Usuario
 from ..schemas import StatusIn
+from ..services.fcm_service import notificar_a_todos
 from ..services.serializers import nota_dict, pin_dict, usuario_dict
 from ..ws.manager import manager
 from .auth import get_usuario_actual
@@ -66,4 +67,15 @@ async def actualizar_estado(
     await manager.transmitir(
         {"type": "status.actualizado", "usuario": usuario_dict(usuario)}
     )
+    try:
+        if datos.status_text:
+            await notificar_a_todos(
+                db,
+                titulo=f"{usuario.display_name} 💬",
+                cuerpo=datos.status_text,
+                data={"type": "status.actualizado", "usuario_id": str(usuario.id)},
+                excluir=usuario.id,
+            )
+    except Exception:
+        pass
     return usuario_dict(usuario)

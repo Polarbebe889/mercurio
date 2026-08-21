@@ -5,9 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'models.dart';
+import 'services/notification_service.dart';
 import 'ws_manager.dart';
 
 class AppState extends ChangeNotifier {
+  AppState._();
+  static final AppState instance = AppState._();
   String? token;
   String? username; // persistente para header x-user-id
   Usuario? yo;
@@ -152,6 +155,9 @@ class AppState extends ChangeNotifier {
   void _onEvento(Map<String, dynamic> ev) {
     eventos.insert(0, ev);
     if (eventos.length > 5) eventos.removeLast();
+    // Push local para cada evento (funciona aunque FCM falle)
+    // ignore: unawaited_futures
+    NotificationService.instance.onWsEvent(ev);
     switch (ev['type']) {
       case 'status.actualizado':
         _patchUsuario(ev['usuario'] as Map<String, dynamic>);

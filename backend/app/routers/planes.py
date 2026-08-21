@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import EstadoPlan, EstadoPlanRegistro, Plan, Usuario
 from ..schemas import PlanEstadoIn, PlanIn
+from ..services.fcm_service import notificar_a_todos
 from ..services.serializers import plan_dict, usuario_dict
 from ..ws.manager import manager
 from .auth import get_usuario_actual
@@ -65,6 +66,16 @@ async def crear_plan(
     db.refresh(plan)
 
     await manager.transmitir({"type": "plan.nuevo", "plan": plan_dict(plan)})
+    try:
+        await notificar_a_todos(
+            db,
+            titulo=f"Nuevo plan: {plan.titulo} 📅",
+            cuerpo=plan.lugar or "Toca para ver",
+            data={"type": "plan.nuevo", "plan_id": str(plan.id)},
+            excluir=usuario.id,
+        )
+    except Exception:
+        pass
     return plan_dict(plan)
 
 
@@ -110,5 +121,27 @@ async def cambiar_estado(
     # este evento; a los otros 5, no a quien tocó el botón).
     if nuevo == EstadoPlan.EN_CAMINO:
         await manager.transmitir({**payload, "type": "plan.impulso_push"}, ignorar=usuario.id)
+        try:
+            await notificar_a_todos(
+                db,
+                titulo=f"{usuario.display_name} va en camino 🚗",
+                cuerpo=plan.titulo,
+                data={"type": "plan.impulso_push", "plan_id": str(plan_id)},
+                excluir=usuario.id,
+            )
+        except Exception:
+            pass
     await manager.transmitir(payload)
+    # Notificación general para cualquier cambio de estado (opcional, no spam)
+    try:
+        if nuevo != EstadoPlan.EN_CAMINO:
+            await notificar_a_todos(
+                db,
+                titulo=f"{usuario.display_name}: {nuevo.value}",
+                cuerpo=plan.titulo,
+                data={"type": "plan.estado", "plan_id": str(plan_id)},
+                excluir=usuario.id,
+            )
+    except Exception:
+        pass
     return payload
