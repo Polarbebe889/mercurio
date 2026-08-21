@@ -158,7 +158,7 @@ class _DashboardPremiumState extends State<DashboardPremium> {
         return;
       }
     }
-    // En PWA web, ImageSource.camera a veces falla en iOS si no es https o no es PWA instalada; usa gallery como fallback
+    // En PWA web, ImageSource.camera a veces falla en iOS si no es HTTPS o no es PWA instalada; usa gallery como fallback
     XFile? x;
     try {
       x = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
@@ -166,8 +166,17 @@ class _DashboardPremiumState extends State<DashboardPremium> {
       debugPrint('[Foto] camera failed, trying gallery: $e');
     }
     if (x == null && kIsWeb) {
-      // Fallback a galería en web si cámara falla
+      // Fallback a galería en web si cámara falla (iOS PWA camera a veces abre pero no devuelve)
       try { x = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85); } catch (_) {}
+    }
+    if (x == null) {
+      // Intento extra: en PWA web, si camera falla y no hay gallery, mostramos mensaje claro
+      if (kIsWeb) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo acceder a la cámara en PWA — usa la galería o la app nativa')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo acceder a la cámara')));
+      }
+      return;
     }
     if (x == null) return;
     try {
