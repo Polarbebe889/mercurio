@@ -72,5 +72,18 @@
 	<string>Mercurio necesita el micrófono para historias de voz</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Mercurio necesita acceso a fotos para drops</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>mercurio</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>mercurio</string>
+				<string>uranio</string>
+				<string>el-bunker</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

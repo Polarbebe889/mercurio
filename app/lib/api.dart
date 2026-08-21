@@ -205,6 +205,6 @@ class Api {
           .then((j) => j as Map<String, dynamic>);
 
   Future<Map<String, dynamic>> spotifyStatus() =>
-      _send(() => http.get(Uri.parse('${AppConfig.apiBase}/api/spotify/status'), headers: _h))
+      _send(() => http.get(Uri.parse('${AppConfig.apiBase}/api/spotify/status?state=$_token'), headers: _h))
           .then((j) => j as Map<String, dynamic>);
 }

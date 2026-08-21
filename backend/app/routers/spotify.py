@@ -94,19 +94,27 @@ async def _handle_spotify_callback(code: str, state: str, error: str, db: Sessio
     if j.get("refresh_token"):
         user.spotify_refresh_token = j.get("refresh_token")
     db.commit()
-    # Éxito: intenta redirigir a custom scheme mercurio://callback y muestra HTML elegante
+    # Éxito: intenta redirigir a custom scheme y muestra HTML con fallback manual (Safari bloquea window.close si no es user gesture)
     return HTMLResponse(
         """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
         <title>Mercurio — Spotify conectado</title>
         <style>body{background:#050505;color:#FFF8E7;font-family:Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px;text-align:center}
         .card{background:#141414;border:1px solid rgba(255,255,255,0.06);border-radius:18px;padding:32px;max-width:420px;width:100%}
         .check{width:64px;height:64px;background:#1DB954;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px}
-        a{color:#1DB954;text-decoration:none;font-weight:700} p{color:#8A929A;font-size:14px}</style>
+        a{color:#1DB954;text-decoration:none;font-weight:700} p{color:#8A929A;font-size:14px} button{background:#1DB954;color:white;border:none;padding:12px 24px;border-radius:12px;font-weight:700;margin-top:12px;cursor:pointer}</style>
         </head><body><div class="card"><div class="check">✓</div><h1 style="margin:0 0 8px">Spotify conectado</h1>
-        <p>Vuelve a Mercurio — puedes cerrar esta ventana.</p>
-        <p><a href="mercurio://callback?success=1">Abrir Mercurio</a></p>
-        <p style="margin-top:16px;font-size:12px;color:#8A929A">Se cerrará automáticamente en 2 segundos…</p>
-        </div><script>setTimeout(()=>{try{window.location.href='mercurio://callback?success=1'}catch(e){};},300);setTimeout(()=>window.close(),2000)</script></body></html>"""
+        <p>¡Listo! Vuelve a <b>Uranio/Mercurio</b> y haz <b>pull-to-refresh</b>. No necesitas abrir el link.</p>
+        <p style="font-size:12px;color:#8A929A">Si tu app no detecta al instante, cierra esta pestaña y vuelve.</p>
+        <p><a href="mercurio://callback?success=1">Abrir Mercurio</a> · <a href="uranio://callback?success=1">Abrir Uranio</a> · <a href="el-bunker://callback?success=1">Abrir El Bunker</a></p>
+        <button onclick="try{window.close()}catch(e){}; window.location.href='about:blank'">Cerrar ventana</button>
+        <p style="margin-top:16px;font-size:12px;color:#8A929A">Se cerrará sola en 3s si tu navegador lo permite…</p>
+        </div><script>
+        // Intenta deep link con múltiples esquemas (Safari bloquea si no hay gesto, por eso el fallback manual)
+        setTimeout(()=>{try{window.location.href='mercurio://callback?success=1'}catch(e){}},500);
+        setTimeout(()=>{try{window.location.href='uranio://callback?success=1'}catch(e){}},800);
+        setTimeout(()=>{try{window.location.href='el-bunker://callback?success=1'}catch(e){}},1100);
+        setTimeout(()=>{try{window.close()}catch(e){}},3000);
+        </script></body></html>"""
     )
 
 

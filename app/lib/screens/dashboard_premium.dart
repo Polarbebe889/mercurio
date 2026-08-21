@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -403,34 +404,62 @@ class _LobbyDetailState extends State<_LobbyDetail> {
   }
 }
 
-class _MusicDetail extends StatelessWidget {
+class _MusicDetail extends StatefulWidget {
   final List<dynamic> usuarios;
   const _MusicDetail({required this.usuarios});
   @override
+  State<_MusicDetail> createState()=>_MusicDetailState();
+}
+class _MusicDetailState extends State<_MusicDetail> {
+  Timer? _poll; bool _polling=false;
+  @override
+  void dispose(){ _poll?.cancel(); super.dispose();}
+  void _startPolling(){
+    if(_polling) return;
+    _polling=true;
+    int intentos=0;
+    _poll=Timer.periodic(const Duration(seconds:2), (_) async {
+      intentos++;
+      if(intentos>30){ _poll?.cancel(); _polling=false; return; }
+      try{
+        final s = await app.api!.spotifyStatus();
+        if(s['conectado']==true){
+          _poll?.cancel(); _polling=false;
+          if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Spotify conectado ✓')));
+          await app.recargarTodo();
+          if(mounted) setState((){});
+        }
+      }catch(_){}
+    });
+  }
+  @override
   Widget build(BuildContext context) {
-    final conMusica = usuarios.where((u)=>u.musica!=null).toList();
+    final conMusica = widget.usuarios.where((u)=>u.musica!=null).toList();
     return _DetailScaffold(
       title: 'Sonando ahora',
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1DB954)), icon: const Icon(Icons.music_note, color: Colors.white), label: const Text('Conectar Spotify', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)), onPressed: () async {
           try {
-            // Intenta via backend (usa base64 user_id, redirect correcto, no expone token)
             final resp = await app.api!.spotifyLogin();
             final authUrl = resp['auth_url'] as String;
             final url = Uri.parse(authUrl);
             if (await canLaunchUrl(url)) {
               await launchUrl(url, mode: LaunchMode.externalApplication);
+              _startPolling();
+              if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Autoriza en el navegador y vuelve — detectando…'), duration: Duration(seconds:3)));
               return;
             }
           } catch (e) {
             debugPrint('[Spotify] login via API fallo: $e');
           }
-          // Fallback legacy con token (compat con backend viejo)
           const clientId = 'c232ed3488354a57aa68e881240120d4';
           final redirect = Uri.encodeComponent('https://mercurio-9haf.onrender.com/auth/spotify/callback');
           final state = app.token ?? '';
           final url = Uri.parse('https://accounts.spotify.com/authorize?client_id=$clientId&response_type=code&redirect_uri=$redirect&scope=user-read-currently-playing%20user-read-playback-state&state=$state');
-          if (await canLaunchUrl(url)) await launchUrl(url, mode: LaunchMode.externalApplication);
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url, mode: LaunchMode.externalApplication);
+            _startPolling();
+          }
         }),
         const SizedBox(height: 6),
         TextButton.icon(icon: const Icon(Icons.apple, size: 16, color: Color(0xFF8A929A)), label: const Text('Apple Music en Android: concede Acceso a notificaciones', style: TextStyle(color: Color(0xFF8A929A), fontSize: 11)), onPressed: ()=>openAppSettings()),
