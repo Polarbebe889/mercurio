@@ -1,0 +1,16 @@
+name: Mercurio Keep-Alive
+
+on:
+  schedule:
+    # Cada 10 minutos. GitHub puede retrasar la ejecución bajo carga alta,
+    # pero el margen es suficiente antes de que Render duerma el servicio
+    # (15 min sin tráfico).
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {} # permite dispararlo manualmente para probar
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend /health
+        run: curl -sf https://TU-BACKEND.onrender.com/health || exit 0
