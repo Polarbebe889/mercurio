@@ -43,13 +43,32 @@ async def _bucle_limpieza() -> None:
             pass  # el siguiente ciclo reintenta; nunca tumba la API
 
 
+async def _bucle_spotify():
+    # Poller Spotify cada 45s (config.SPOTIFY_POLL_SECONDS) — solo si hay credenciales
+    if not config.SPOTIFY_CLIENT_ID or not config.SPOTIFY_CLIENT_SECRET:
+        return
+    from .services.spotify_poll import bucle_spotify
+
+    await bucle_spotify()
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     init_db()
     config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    tarea = asyncio.create_task(_bucle_limpieza())
+    tarea_limpieza = asyncio.create_task(_bucle_limpieza())
+    tarea_spotify = asyncio.create_task(_bucle_spotify())
     yield
-    tarea.cancel()
+    tarea_limpieza.cancel()
+    tarea_spotify.cancel()
+    try:
+        await tarea_limpieza
+    except asyncio.CancelledError:
+        pass
+    try:
+        await tarea_spotify
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(
