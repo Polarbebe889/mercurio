@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Mercurio necesita la cámara para capturar drops</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mercurio necesita el micrófono para historias de voz</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Mercurio necesita acceso a fotos para drops</string>
 </dict>
 </plist>
