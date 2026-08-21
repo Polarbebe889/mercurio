@@ -121,17 +121,26 @@ async def _set_musica(db: Session, usuario: Usuario, titulo: str, artista: str, 
 
 
 async def _set_no_musica(db: Session, usuario: Usuario):
+    # Siempre asegura que haya entrada spotify con reproduciendo=False para que el frontend detecte "conectado"
     existente = db.get(AhoraEscuchando, usuario.id)
-    # solo borra si era de spotify y estaba reproduciendo, o pon reproduciendo=False
-    # para no borrar Apple Music, solo spotify
-    if existente and existente.provider == ProviderMusica.SPOTIFY:
-        # si ya estaba no reproduciendo, no spamees
-        if not existente.reproduciendo:
-            return
-        existente.reproduciendo = False
+    if existente is None:
+        existente = AhoraEscuchando(usuario_id=usuario.id, provider=ProviderMusica.SPOTIFY, titulo="", artista="", album="", artwork_url="", reproduciendo=False)
+        db.add(existente)
         existente.updated_at = datetime.utcnow()
         db.commit()
-        await manager.transmitir({"type": "musica.detenida", "usuario_id": usuario.id})
+        db.refresh(existente)
+        await manager.transmitir({"type": "musica.actualizada", "usuario_id": usuario.id, "musica": musica_dict(existente)})
+        return
+    if existente.provider != ProviderMusica.SPOTIFY:
+        # no toques Apple Music
+        return
+    if not existente.reproduciendo:
+        # ya está en false, no spamees pero asegura que sigue existiendo para "conectado"
+        return
+    existente.reproduciendo = False
+    existente.updated_at = datetime.utcnow()
+    db.commit()
+    await manager.transmitir({"type": "musica.detenida", "usuario_id": usuario.id})
 
 
 async def poll_spotify_once():

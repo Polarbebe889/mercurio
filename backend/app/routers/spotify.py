@@ -94,6 +94,32 @@ async def _handle_spotify_callback(code: str, state: str, error: str, db: Sessio
     if j.get("refresh_token"):
         user.spotify_refresh_token = j.get("refresh_token")
     db.commit()
+    # Crea placeholder AhoraEscuchando para que el frontend detecte "conectado" inmediato (antes del primer poll de 45s)
+    try:
+        from ..models import AhoraEscuchando, ProviderMusica
+        from ..services.serializers import musica_dict
+        from ..ws.manager import manager
+
+        existente = db.get(AhoraEscuchando, user.id)
+        if existente is None:
+            placeholder = AhoraEscuchando(usuario_id=user.id, provider=ProviderMusica.SPOTIFY, titulo="", artista="", album="", artwork_url="", reproduciendo=False)
+            db.add(placeholder)
+            db.commit()
+            db.refresh(placeholder)
+            # no bloquees el callback si WS falla
+            try:
+                import asyncio
+
+                asyncio.create_task(manager.transmitir({"type": "musica.actualizada", "usuario_id": user.id, "musica": musica_dict(placeholder)}))
+            except Exception:
+                pass
+        elif existente.provider != ProviderMusica.SPOTIFY:
+            pass
+        else:
+            # ya existe spotify, asegura que siga con reproduciendo=False hasta el primer poll
+            pass
+    except Exception:
+        pass  # no rompas el callback si falla el placeholder
     # Éxito: intenta redirigir a custom scheme y muestra HTML con fallback manual (Safari bloquea window.close si no es user gesture)
     return HTMLResponse(
         """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

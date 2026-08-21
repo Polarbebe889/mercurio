@@ -210,13 +210,25 @@ class _DashboardPremiumState extends State<DashboardPremium> {
                       detail: _MusicDetail(usuarios: usuarios),
                       child: Builder(builder: (context){
                         final conMusica = usuarios.where((u)=>u.musica!=null && u.musica!.reproduciendo).toList();
+                        final spotifyConectado = usuarios.any((u)=> u.musica?.provider=='spotify');
                         if (conMusica.isEmpty) {
-                          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            const Row(children: [Icon(Icons.graphic_eq_rounded, size: 14, color: Color(0xFF8A929A)), SizedBox(width: 6), Text('SONANDO', style: TextStyle(color: Color(0xFF8A929A), fontSize: 10, letterSpacing: 1.2))]),
-                            const SizedBox(height: 12),
-                            const Text('Nadie suena', style: TextStyle(color: Color(0xFF8A929A), fontSize: 12)),
-                            const SizedBox(height: 6),
-                            const Text('Toca para conectar Spotify', style: TextStyle(color: Color(0xFFFFF8E7), fontSize: 11, fontWeight: FontWeight.w600)),
+                          if (spotifyConectado) {
+                            return const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Row(children: [Icon(Icons.graphic_eq_rounded, size: 14, color: Color(0xFF8A929A)), SizedBox(width: 6), Text('SONANDO', style: TextStyle(color: Color(0xFF8A929A), fontSize: 10, letterSpacing: 1.2))]),
+                              SizedBox(height: 12),
+                              Text('Spotify conectado ✓', style: TextStyle(color: Color(0xFF1DB954), fontSize: 12, fontWeight: FontWeight.w700)),
+                              SizedBox(height: 6),
+                              Text('Pon algo a sonar en Spotify', style: TextStyle(color: Color(0xFF8A929A), fontSize: 11)),
+                              SizedBox(height: 4),
+                              Text('Se sincroniza solo cada 45s', style: TextStyle(color: Color(0xFF5A6270), fontSize: 9)),
+                            ]);
+                          }
+                          return const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Row(children: [Icon(Icons.graphic_eq_rounded, size: 14, color: Color(0xFF8A929A)), SizedBox(width: 6), Text('SONANDO', style: TextStyle(color: Color(0xFF8A929A), fontSize: 10, letterSpacing: 1.2))]),
+                            SizedBox(height: 12),
+                            Text('Nadie suena', style: TextStyle(color: Color(0xFF8A929A), fontSize: 12)),
+                            SizedBox(height: 6),
+                            Text('Toca para conectar Spotify', style: TextStyle(color: Color(0xFFFFF8E7), fontSize: 11, fontWeight: FontWeight.w600)),
                           ]);
                         }
                         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
