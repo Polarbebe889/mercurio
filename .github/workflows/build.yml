@@ -1,4 +1,4 @@
-name: Build El Bunker (Android + iOS)
+name: Build Mercurio (Android + iOS)
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
+          name: mercurio-release-apk
           path: app/build/app/outputs/flutter-apk/app-release.apk
 
   build-ios:
@@ -40,14 +40,14 @@ jobs:
           flutter build ios --release --no-codesign
       - name: Package IPA
         run: |
+          mkdir -p output_ipa
           cd app/build/ios/iphoneos
           mkdir Payload
           mv Runner.app Payload/
-          zip -r el-bunker.ipa Payload
-          mkdir -p ../../../output_ipa
-          mv el-bunker.ipa ../../../output_ipa/
+          zip -r mercurio.ipa Payload
+          mv mercurio.ipa ../../../../output_ipa/
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa-unsigned
-          path: output_ipa/el-bunker.ipa
+          name: mercurio-ipa-unsigned
+          path: output_ipa/mercurio.ipa
