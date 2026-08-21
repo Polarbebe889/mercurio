@@ -50,13 +50,26 @@ async def actualizar_musica(
     return musica_dict(musica)
 
 
+@router.post("/apple_push")
+async def apple_push(
+    datos: MusicaIn,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_usuario_actual),
+):
+    # Endpoint push para Apple Music (iOS MPMusicPlayer + Android MediaSession).
+    # Reusa la misma lógica que PUT /me pero forzando provider music_kit.
+    return await actualizar_musica(datos, db, usuario)
+
+
 @router.delete("/me")
 async def detener_musica(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_usuario_actual),
 ):
-    db.delete(db.get(AhoraEscuchando, usuario.id))
-    db.commit()
+    existing = db.get(AhoraEscuchando, usuario.id)
+    if existing is not None:
+        db.delete(existing)
+        db.commit()
     await manager.transmitir(
         {"type": "musica.detenida", "usuario_id": usuario.id}
     )

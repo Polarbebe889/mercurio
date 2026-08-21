@@ -8,6 +8,7 @@ import 'package:record/record.dart';
 
 import '../main.dart';
 import '../config.dart';
+import '../services/apple_music_push.dart';
 import '../theme/uranio_premium_theme.dart';
 
 
@@ -24,6 +25,14 @@ class DashboardPremium extends StatefulWidget {
 
 class _DashboardPremiumState extends State<DashboardPremium> {
   final _recorder = AudioRecorder();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      app.recargarTodo();
+      AppleMusicPush.iniciar();
+    });
+  }
 
   // ── FIX AUDIO: permission_handler + try/catch ──
   Future<void> _grabarVoz() async {
